@@ -1,6 +1,9 @@
 # pdf-er bør kanskje ikkje deles.
 *.pdf
 
+# .vscode kan ignoreres
+.vscode/
+
 # Temporary test files
 **test.py
 
