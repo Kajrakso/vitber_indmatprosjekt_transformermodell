@@ -103,12 +103,6 @@ class Attention(Layer):
     def backward(self, grad: np.ndarray) -> np.ndarray:
         pass
 
-    def step_gd(self, alpha: float) -> None:
-        self.W_K.step_gd(alpha)
-        self.W_Q.step_gd(alpha)
-        self.W_V.step_gd(alpha)
-        self.W_O.step_gd(alpha)
-
 
 class Softmax(Layer):
     def __init__(self):
