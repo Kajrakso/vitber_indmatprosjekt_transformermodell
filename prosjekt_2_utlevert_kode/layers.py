@@ -121,15 +121,26 @@ class Softmax(Layer):
 
 
 class CrossEntropy(Layer):
+    epsilon = 1e-8
     def __init__(self, your_arguments_here):
-        """
-        Your code here
-        """
         return
 
-    def forward(self, x) -> np.ndarray: ...
+    def forward(self, y_hat: np.ndarray, y:np.ndarray) -> np.ndarray:
+        b, m, n = np.shape(y_hat)
+        self.b = b
+        self.m = m
+        self.n = n
+        self.y_hot = onehot(y, m)
+        self.y_hat = y_hat
+        p = np.sum(np.einsum('bij,bij->bij', self.y_hot, y_hat))
+        q = -np.log(p)         
+        object_func = np.average(q)
+        return object_func
 
-    def backward(self) -> np.ndarray: ...
+
+    def backward(self) -> np.ndarray:
+        return -(self.y_hot / (self.y_hat + self.epsilon)) / self.n
+      
 
 
 class LinearLayer(Layer):
