@@ -70,7 +70,7 @@ class Attention(Layer):
         self.W_V = np.random.randn(k, d) / initial_scale
         self.W_O = np.random.randn(k, d) / initial_scale
 
-        self.prams = {
+        self.params = {
             "W_K": {"w": self.W_K, "d": np.zeros_like(self.W_K)},
             "W_Q": {"w": self.W_Q, "d": np.zeros_like(self.W_Q)},
             "W_V": {"w": self.W_V, "d": np.zeros_like(self.W_V)},
@@ -89,8 +89,8 @@ class Attention(Layer):
         self.B[i1, i2] -= np.inf
 
         # Is used again in the backward pass.
-        # !TODO: Check if it is faster than inserting it into an einsum twice
-        self.W_QK = self.W_Q @ self.W_K  # shape=(d, d)
+        # !TODO: Check if it is faster than inserting it into an einsum three times
+        self.W_QK = self.W_Q.T @ self.W_K  # shape=(d, d)
 
         # z.T @ W_Q.T @ W_K @ z
         M = np.einsum("bni,nm,bmj->bij", x, self.W_QK, x, out=None)
@@ -101,12 +101,38 @@ class Attention(Layer):
         return x + np.einsum("ki,km,bmn,bnj->bij", self.W_O, self.W_V, x, self.A)
 
     def backward(self, grad: np.ndarray) -> np.ndarray:
-        pass
+        b = grad.shape[0]
+        g_OV = np.einsum("ki,km,bmj->bij", self.W_V, self.W_O, grad)
+        g_S = self.softmax.backward(np.einsum("bki,bkj->bij", self.x, g_OV))
+
+        self.params["W_K"]["d"] = (
+            np.einsum("ik,bkn,bnm,bjm->ij", self.W_Q, self.x, g_S, self.x) / b
+        )
+        self.params["W_Q"]["d"] = (
+            np.einsum("ik,bkn,bmn,bjm->ij", self.W_K, self.x, g_S, self.x) / b
+        )
+
+        self.params["W_V"]["d"] = (
+            np.einsum("ik,bkn,bmn,bjm->ij", self.W_O, grad, self.A, self.x) / b
+        )
+        self.params["W_O"]["d"] = (
+            np.einsum("ik,bkn,bnm,bjm->ij", self.W_V, self.x, self.A, grad) / b
+        )
+
+        # Note W_K.T @ W_Q = (W_Q.T @ W_K).T = W_QK.T
+        return (
+            grad
+            + np.einsum("bik,bjk->bij", g_OV, self.A)
+            + np.einsum("ki,bkn,bnj->bij", self.W_QK, self.x, g_S)
+            + np.einsum("ik,bkn,bjn->bij", self.W_QK, self.x, g_S)
+        )
 
 
 class Softmax(Layer):
+    epsilon = 1e-8
+
     def __init__(self):
-        self.epsilon = 1e-8
+        pass
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         # To prevent overflow, we use the trick given in the task description.
