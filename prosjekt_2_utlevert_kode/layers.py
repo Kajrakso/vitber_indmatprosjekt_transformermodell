@@ -127,6 +127,10 @@ class Attention(Layer):
             + np.einsum("ik,bkn,bjn->bij", self.W_QK, self.x, g_S)
         )
 
+    def step_gd(self, alpha: float) -> None:
+        self.softmax.step_gd(alpha)
+        super().step_gd(alpha)
+
 
 class Softmax(Layer):
     epsilon = 1e-8
