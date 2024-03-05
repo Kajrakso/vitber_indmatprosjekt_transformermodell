@@ -10,8 +10,16 @@ class Layer:
     Base class for layers in the neural network with forward and backward pass.
     """
 
+    epsilon = 1e-8
+    beta_1 = 0.9
+    beta_2 = 0.999
+
     def __init__(self):
         self.params: dict[str, dict[str, np.ndarray]] = dict()
+        self.adam_params: dict[str, float] = {
+            "M": 0,
+            "V": 0,
+        }
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         """Performs a forward pass of the layer.
@@ -56,6 +64,15 @@ class Layer:
         for param in self.params:
             self.params[param]["w"] -= alpha * self.params[param]["d"]
 
+    def step_adam(self, alpha: float):
+        for param in self.params.values():
+            G = param["d"]
+            M = self.beta_1 * self.adam_params["M"] + (1 - self.beta_1) * G
+            V = self.beta_2 * self.adam_params["V"] + (1 - self.beta_2) * G**2
+            M_hat = M / (1 - self.beta_1)
+            V_hat = V / (1 - self.beta_2)
+            param["W"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
+
 
 class Attention(Layer):
     def __init__(self, k: int, d: int, initial_scale=0.1):
@@ -63,6 +80,7 @@ class Attention(Layer):
         Args:
             (k, d): shape of parameter matrices.
         """
+        super().__init__()
         # Initializes the four matrices to something random.
         self.W_K = np.random.randn(k, d) / initial_scale
         self.W_Q = np.random.randn(k, d) / initial_scale
@@ -133,10 +151,8 @@ class Attention(Layer):
 
 
 class Softmax(Layer):
-    epsilon = 1e-8
-
     def __init__(self):
-        pass
+        super().__init__()
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         # To prevent overflow, we use the trick given in the task description.
@@ -151,15 +167,40 @@ class Softmax(Layer):
 
 
 class CrossEntropy(Layer):
-    def __init__(self, your_arguments_here):
-        """
-        Your code here
-        """
+    epsilon = 1e-8
+    def __init__(self):
         return
 
-    def forward(self, x) -> np.ndarray: ...
+    def forward(self, y_hat: np.ndarray, y: np.ndarray) -> float:
+        """ forward step for one batch
 
-    def backward(self) -> np.ndarray: ...
+        Args:
+            y_hat (np.ndarray): the prediction matrix from the transformer model, dim (m, n)
+            y (np.ndarray): array of the correct solutions, dim (n)
+
+        Returns:
+            float: the average loss of the entire batch
+        """
+        _, m, n = np.shape(y_hat)
+        # self.b = b
+        # self.m = m
+        self.n = n
+        self.y_hot = onehot(y, m)
+        self.y_hat = y_hat
+        p = np.sum(np.einsum('bij,bij->bij', self.y_hot, y_hat))
+        q = -np.log(p)
+        return np.average(q)
+
+
+
+    def backward(self) -> np.ndarray:
+        """backward step for cross entropy
+
+        Returns:
+            np.ndarray: gradient wrt the prediciton from the transformer model 
+        """
+        return -(self.y_hot / (self.y_hat + self.epsilon)) / self.n
+      
 
 
 class LinearLayer(Layer):
@@ -172,7 +213,7 @@ class LinearLayer(Layer):
         Constructor takes input size and output size of layer
         and scale for the weights
         """
-
+        super().__init__()
         # Initialize weights using a sample from the normal distribution
         # scaled with the init_scale
         self.w = np.random.randn(output_size, input_size) * init_scale
@@ -222,7 +263,7 @@ class Relu(Layer):
     """
 
     def __init__(self):
-        return
+        super().__init__()
 
     def relu(self, x):
         # relu(x) = max(0,x)
@@ -245,7 +286,7 @@ class EmbedPosition(Layer):
         m: number of items in the vocabulary / number of integers
         d: embedding dimension
         """
-
+        super().__init__()
         # Initialize a linear layer for the embedding
         self.embed = LinearLayer(m, d, init_scale)
         # Initialize the position embedding matrix
@@ -318,7 +359,7 @@ class FeedForward(Layer):
             p: output dimension of first and input of second.
 
         """
-
+        super().__init__()
         # first linear layer with input size d and output size p
         self.l1 = LinearLayer(d, p, init_scale)
 
