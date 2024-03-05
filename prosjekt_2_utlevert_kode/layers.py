@@ -166,19 +166,33 @@ class CrossEntropy(Layer):
     def __init__(self):
         return
 
-    def forward(self, y_hat: np.ndarray, y: np.ndarray) -> np.ndarray:
-        b, m, n = np.shape(y_hat)
-        self.b = b
-        self.m = m
+    def forward(self, y_hat: np.ndarray, y: np.ndarray) -> float:
+        """ forward step for one batch
+
+        Args:
+            y_hat (np.ndarray): the prediction matrix from the transformer model, dim (m, n)
+            y (np.ndarray): array of the correct solutions, dim (n)
+
+        Returns:
+            float: the average loss of the entire batch
+        """
+        _, m, n = np.shape(y_hat)
+        # self.b = b
+        # self.m = m
         self.n = n
         self.y_hot = onehot(y, m)
         self.y_hat = y_hat
-        p = np.sum(np.einsum("bij,bij->bij", self.y_hot, y_hat))
+        p = np.sum(np.einsum('bij,bij->bij', self.y_hot, y_hat))
         q = -np.log(p)
-        object_func = np.average(q)
-        return object_func
+        return np.average(q)
+
 
     def backward(self) -> np.ndarray:
+        """backward step for cross entropy
+
+        Returns:
+            np.ndarray: gradient wrt the prediciton from the transformer model 
+        """
         return -(self.y_hot / (self.y_hat + self.epsilon)) / self.n
 
 
