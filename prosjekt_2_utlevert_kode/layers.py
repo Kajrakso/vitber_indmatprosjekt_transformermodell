@@ -65,6 +65,20 @@ class Layer:
             self.params[param]["w"] -= alpha * self.params[param]["d"]
 
     def step_adam(self, alpha: float):
+        """
+        Performs a gradient descent step given learning rate. The parameter matrices
+        are updated in-place.
+        Assumes that the layer has a parameter dictionary "params" on the form
+
+        params = {
+            'w1': {
+                'w': w,         The parameter matrix
+                'd': d,         The gradient of loss wrt the parameter matrix
+                },
+            'w2': {....},
+        }
+        where each parameter has a key 'w' for weights and 'd' for gradients.
+        """
         for param in self.params.values():
             G = param["d"]
             M = self.beta_1 * self.adam_params["M"] + (1 - self.beta_1) * G
@@ -167,7 +181,7 @@ class CrossEntropy(Layer):
         return
 
     def forward(self, y_hat: np.ndarray, y: np.ndarray) -> float:
-        """ forward step for one batch
+        """forward step for one batch
 
         Args:
             y_hat (np.ndarray): the prediction matrix from the transformer model, dim (m, n)
@@ -182,16 +196,15 @@ class CrossEntropy(Layer):
         self.n = n
         self.y_hot = onehot(y, m)
         self.y_hat = y_hat
-        p = np.sum(np.einsum('bij,bij->bij', self.y_hot, y_hat))
+        p = np.sum(np.einsum("bij,bij->bij", self.y_hot, y_hat))
         q = -np.log(p)
         return np.average(q)
-
 
     def backward(self) -> np.ndarray:
         """backward step for cross entropy
 
         Returns:
-            np.ndarray: gradient wrt the prediciton from the transformer model 
+            np.ndarray: gradient wrt the prediciton from the transformer model
         """
         return -(self.y_hot / (self.y_hat + self.epsilon)) / self.n
 
