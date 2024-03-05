@@ -145,14 +145,10 @@ class Attention(Layer):
             + np.einsum("ik,bkn,bjn->bij", self.W_QK, self.x, g_S)
         )
 
-    def step_gd(self, alpha: float) -> None:
-        self.softmax.step_gd(alpha)
-        super().step_gd(alpha)
-
 
 class Softmax(Layer):
     def __init__(self):
-        super().__init__()
+        return
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         # To prevent overflow, we use the trick given in the task description.
@@ -167,26 +163,23 @@ class Softmax(Layer):
 
 
 class CrossEntropy(Layer):
-    epsilon = 1e-8
-    def __init__(self, your_arguments_here):
+    def __init__(self):
         return
 
-    def forward(self, y_hat: np.ndarray, y:np.ndarray) -> np.ndarray:
+    def forward(self, y_hat: np.ndarray, y: np.ndarray) -> np.ndarray:
         b, m, n = np.shape(y_hat)
         self.b = b
         self.m = m
         self.n = n
         self.y_hot = onehot(y, m)
         self.y_hat = y_hat
-        p = np.sum(np.einsum('bij,bij->bij', self.y_hot, y_hat))
-        q = -np.log(p)         
+        p = np.sum(np.einsum("bij,bij->bij", self.y_hot, y_hat))
+        q = -np.log(p)
         object_func = np.average(q)
         return object_func
 
-
     def backward(self) -> np.ndarray:
         return -(self.y_hot / (self.y_hat + self.epsilon)) / self.n
-      
 
 
 class LinearLayer(Layer):
@@ -249,7 +242,7 @@ class Relu(Layer):
     """
 
     def __init__(self):
-        super().__init__()
+        return
 
     def relu(self, x):
         # relu(x) = max(0,x)
@@ -335,9 +328,12 @@ class EmbedPosition(Layer):
         # and does gd for the paramters in the params dict
         super().step_gd(step_size)
 
+    def step_adam(self, alpha: float):
+        self.embed.step_adam(alpha)
+        return super().step_adam(alpha)
+
 
 class FeedForward(Layer):
-
     def __init__(self, d, p, init_scale=0.1):
         """
         Input:
@@ -345,7 +341,6 @@ class FeedForward(Layer):
             p: output dimension of first and input of second.
 
         """
-        super().__init__()
         # first linear layer with input size d and output size p
         self.l1 = LinearLayer(d, p, init_scale)
 
@@ -392,7 +387,10 @@ class FeedForward(Layer):
         return grad + grad_feed_forward
 
     def step_gd(self, step_size):
-
         # Call the step_gd method of the linear layers
         self.l1.step_gd(step_size)
         self.l2.step_gd(step_size)
+
+    def step_adam(self, alpha: float):
+        self.l1.step_adam(alpha)
+        self.l2.step_adam(alpha)
