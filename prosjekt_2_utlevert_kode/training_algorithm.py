@@ -17,8 +17,6 @@ def alg4(
     network,
     loss_func,
     alpha,
-    beta1,
-    beta2,
     n_iter,
     num_ints,
     num_batches,
@@ -38,7 +36,8 @@ def alg4(
             L[j] = loss_func.forward(y_hat=Z, y=y[j])
             grad_Z = loss.backward()
             _ = network.backward(grad_Z)
-            _ = network.step_gd(alpha)
+            # _ = network.step_gd(alpha)
+            _ = network.step_adam(alpha)
 
         # hopefully L will decrease as we optimize
         print(f"{i+1:>15} | {np.mean(L):>15.10f}")
@@ -46,10 +45,8 @@ def alg4(
 
 
 if __name__ == "__main__":
-    # parameters for Adam
+    # alpha parameter for Adam
     alpha = 0.01
-    beta1 = 0.9
-    beta2 = 0.999
 
     # generate a training set as per
     # exercise 3.3
@@ -99,8 +96,6 @@ if __name__ == "__main__":
         network,
         loss,
         alpha,
-        beta1,
-        beta2,
         n_iter,
         num_ints=m,
         num_batches=b,
