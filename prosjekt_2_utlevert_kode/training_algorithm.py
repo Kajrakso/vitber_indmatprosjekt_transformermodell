@@ -2,23 +2,21 @@ from neural_network import NeuralNetwork
 from layers import LinearLayer, CrossEntropy, EmbedPosition, Softmax
 from data_generators import get_train_test_sorting
 import numpy as np
+from utils import onehot
 
 def alg4(training_data, network, loss_func, alpha, beta1, beta2, n_iter) -> None:
     """optimizes the paramaters in the network using the Adam algorithm"""
     x = training_data['x_train']
     y = training_data['y_train']
-    
     for i in range(n_iter):
-        # print(np.shape(x))
         Z = network.forward(x)
         L = loss_func.forward(Z, y)
-        
-        # hopefully L will decrease as we optimize
-        print(L)
-
         grad_Z = loss.backward()
         _ = network.backward(grad_Z)
         _ = network.step_gd(alpha)
+
+        # hopefully L will decrease as we optimize
+        print(f"Iteration {i}: L = {np.mean(L):>10.5f}")
 
 
 
