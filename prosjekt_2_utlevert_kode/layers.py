@@ -85,7 +85,7 @@ class Layer:
             V = self.beta_2 * self.adam_params["V"] + (1 - self.beta_2) * G**2
             M_hat = M / (1 - self.beta_1)
             V_hat = V / (1 - self.beta_2)
-            param["W"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
+            param["w"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
 
 
 class Attention(Layer):
@@ -197,7 +197,9 @@ class CrossEntropy(Layer):
         self.y_hot = onehot(y, m)
         self.y_hat = y_hat
         # p = np.sum(np.einsum("bij,bij->bij", self.y_hot, y_hat))
-        p = np.einsum("bij,bij->bj", self.y_hot, self.y_hat)                 # burde det ikkje vere slik? 
+        p = np.einsum(
+            "bij,bij->bj", self.y_hot, self.y_hat
+        )  # burde det ikkje vere slik?
         q = -np.log(p)
         return np.average(q)
 
@@ -347,7 +349,6 @@ class EmbedPosition(Layer):
         return None
 
     def step_gd(self, step_size):
-
         # We need to call the step_gd method of the linear layer
         self.embed.step_gd(step_size)
 
