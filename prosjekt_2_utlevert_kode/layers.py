@@ -196,7 +196,8 @@ class CrossEntropy(Layer):
         self.n = n
         self.y_hot = onehot(y, m)
         self.y_hat = y_hat
-        p = np.sum(np.einsum("bij,bij->bij", self.y_hot, y_hat))
+        # p = np.sum(np.einsum("bij,bij->bij", self.y_hot, y_hat))
+        p = np.einsum("bij,bij->bj", self.y_hot, self.y_hat)                 # burde det ikkje vere slik? 
         q = -np.log(p)
         return np.average(q)
 
