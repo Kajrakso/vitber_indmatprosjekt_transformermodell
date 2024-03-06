@@ -227,6 +227,13 @@ class LinearLayer(Layer):
         # scaled with the init_scale
         self.w = np.random.randn(output_size, input_size) * init_scale
         self.params = {"w": {"w": self.w, "d": np.zeros_like(self.w)}}
+        self.has_computed = False
+
+    def precompute_einsum_paths(self, x: np.ndarray):
+        self.forward_path = np.einsum_path("od,bdn->bon", self.w, x, optimize="optimal")
+        self.backward_path = np.einsum_path(
+            "od,bon->bdn", self.w, x, optimize="optimal"
+        )
 
     def forward(self, x) -> np.ndarray:
         """
@@ -239,12 +246,16 @@ class LinearLayer(Layer):
         Returns:
             y: array of shape (batch_size, output_size, n) = (b,o,n)
         """
+        if not self.has_computed:
+            self.precompute_einsum_paths(x)
 
         self.x = x
 
         # Return output of layer
         # y = w@x
-        y = np.einsum("od,bdn->bon", self.params["w"]["w"], x)
+        y = np.einsum(
+            "od,bdn->bon", self.params["w"]["w"], x, optimize=self.forward_path
+        )
         return y
 
     def backward(self, grad) -> np.ndarray:
@@ -263,7 +274,9 @@ class LinearLayer(Layer):
 
         # Return gradient of loss wrt input of layer
         # dL/dx = w.T@grad
-        return np.einsum("od,bon->bdn", self.params["w"]["w"], grad)
+        return np.einsum(
+            "od,bon->bdn", self.params["w"]["w"], grad, optimize=self.backward_path
+        )
 
 
 class Relu(Layer):
