@@ -1,5 +1,7 @@
 import numpy as np
 from utils import onehot
+from numba import njit
+from numba.experimental import jitclass
 
 
 # Test if precomputing the optimal einsum-path has an effect on performance.
@@ -7,7 +9,7 @@ from utils import onehot
 
 class Layer:
     """
-    Base class for layers in the neural network with forward and backward pass.
+    Base class for layers in the neural network with forward and backward pass. Compatible with numba.
     """
 
     epsilon = 1e-8
@@ -20,9 +22,6 @@ class Layer:
             "M": 0,
             "V": 0,
         }
-
-    def precompute_einsum_paths(self):
-        raise NotImplementedError
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         """Performs a forward pass of the layer.
@@ -96,8 +95,6 @@ class Attention(Layer):
         """
         Args:
             (k, d): shape of parameter matrices.
-            n (int): size of input sequences
-
         """
         super().__init__()
         # Initializes the four matrices to something random.
@@ -116,56 +113,8 @@ class Attention(Layer):
 
         self.softmax = Softmax()
 
-        # Precompute einsum paths
-        self.has_computed = False
-
-    def precompute_einsum_paths(self, x: np.ndarray) -> None:
-        """Precomputes the optimal einsum path for all the einsums in
-        both forward and backward pass.
-
-        Args:
-            x (np.ndarray[b, d, n]): The input x in order to get the input dimensions.
-        """
-        M = np.random.randn(x.shape[0], self.x.shape[2], x.shape[2])  # shape[b, n, n]
-        QK = self.W_Q.T @ self.W_K  # shape[d, d]
-
-        # Forward pass
-        self.M_path = np.einsum_path("bni,nm,bmj->bij", x, QK, x, optimize="optimal")[0]
-        self.forward_path = np.einsum_path(
-            "ki,km,bmn,bnj->bij", self.W_O, self.W_V, x, M, optimize="optimal"
-        )[0]
-
-        # Backward pass
-        self.g_OV_path = np.einsum_path(
-            "ki,km,bmj->bij", self.W_V, self.W_O, x, optimize="optimal"
-        )[0]
-        self.g_S_path = np.einsum_path("bki,bkj->bij", x, x, optimize="optimal")[0]
-
-        self.W_Kd_path = np.einsum_path(
-            "ik,bkn,bnm,bjm->ij", self.W_Q, x, M, x, optimize="optimal"
-        )[0]
-        self.W_Qd_path = np.einsum_path(
-            "ik,bkn,bmn,bjm->ij", self.W_K, x, M, x, optimize="optimal"
-        )[0]
-        self.W_Vd_path = np.einsum_path(
-            "ik,bkn,bmn,bjm->ij", self.W_O, x, M, x, optimize="optimal"
-        )[0]
-        self.W_Od_path = np.einsum_path(
-            "ik,bkn,bnm,bjm->ij", self.W_V, x, M, x, optimize="optimal"
-        )[0]
-
-        self.result1_path = np.einsum_path("bik,bjk->bij", x, M, optimize="optimal")[0]
-        self.result2_path = np.einsum_path(
-            "ki,bkn,bnj->bij", QK, x, M, optimize="optimal"
-        )[0]
-        self.result3_path = np.einsum_path(
-            "ik,bkn,bjn->bij", QK, x, M, optimize="optimal"
-        )[0]
-
     def forward(self, x: np.ndarray) -> np.ndarray:
         self.x = x
-        if not self.has_computed:
-            self.precompute_einsum_paths(x)
 
         # !TODO: Possible to extract it so we dont compute the same matrix over and over again?
         n = x.shape[2]
@@ -176,93 +125,41 @@ class Attention(Layer):
         # Is used again in the backward pass.
         # !TODO: Check if it is faster than inserting it into an einsum three times
         self.W_QK = self.W_Q.T @ self.W_K  # shape=(d, d)
-
-        # precompute einsum paths
+        assert self.W_QK.shape == (x.shape[0], x.shape[0])
 
         # z.T @ W_Q.T @ W_K @ z
-        M = np.einsum(
-            "bni,nm,bmj->bij", x, self.W_QK, x, out=None, optimize=self.M_path
-        )  # shape=(b, n, n)
+        M = np.einsum("bni,nm,bmj->bij", x, self.W_QK, x, out=None)
         # !TODO: Possible to take the B out and just force the lower triangle of A to zero?
         self.A = self.softmax.forward(M + self.B)  # shape=(b, n, n)
 
         # z = x + W_O.T @ W_V @ x @ A
-        return x + np.einsum(
-            "ki,km,bmn,bnj->bij",
-            self.W_O,
-            self.W_V,
-            x,
-            self.A,
-            optimize=self.forward_path,
-        )
+        return x + np.einsum("ki,km,bmn,bnj->bij", self.W_O, self.W_V, x, self.A)
 
     def backward(self, grad: np.ndarray) -> np.ndarray:
         b = grad.shape[0]
-        # shape[b, d, n]
-        g_OV = np.einsum(
-            "ki,km,bmj->bij", self.W_V, self.W_O, grad, optimize=self.g_OV_path
-        )
-        # shape[b, n, n]
-        g_S = self.softmax.backward(
-            np.einsum("bki,bkj->bij", self.x, g_OV, optimize=self.g_S_path)
-        )
+        g_OV = np.einsum("ki,km,bmj->bij", self.W_V, self.W_O, grad)
+        g_S = self.softmax.backward(np.einsum("bki,bkj->bij", self.x, g_OV))
 
         self.params["W_K"]["d"] = (
-            np.einsum(
-                "ik,bkn,bnm,bjm->ij",
-                self.W_Q,
-                self.x,
-                g_S,
-                self.x,
-                optimize=self.W_Kd_path,
-            )
-            / b
+            np.einsum("ik,bkn,bnm,bjm->ij", self.W_Q, self.x, g_S, self.x) / b
         )
         self.params["W_Q"]["d"] = (
-            np.einsum(
-                "ik,bkn,bmn,bjm->ij",
-                self.W_K,
-                self.x,
-                g_S,
-                self.x,
-                optimize=self.W_Qd_path,
-            )
-            / b
+            np.einsum("ik,bkn,bmn,bjm->ij", self.W_K, self.x, g_S, self.x) / b
         )
 
         self.params["W_V"]["d"] = (
-            np.einsum(
-                "ik,bkn,bmn,bjm->ij",
-                self.W_O,
-                grad,
-                self.A,
-                self.x,
-                optimize=self.W_Vd_path,
-            )
-            / b
+            np.einsum("ik,bkn,bmn,bjm->ij", self.W_O, grad, self.A, self.x) / b
         )
         self.params["W_O"]["d"] = (
-            np.einsum(
-                "ik,bkn,bnm,bjm->ij",
-                self.W_V,
-                self.x,
-                self.A,
-                grad,
-                optimize=self.W_Od_path,
-            )
-            / b
+            np.einsum("ik,bkn,bnm,bjm->ij", self.W_V, self.x, self.A, grad) / b
         )
 
         # Note W_K.T @ W_Q = (W_Q.T @ W_K).T = W_QK.T
         return (
             grad
-            + np.einsum("bik,bjk->bij", g_OV, self.A, optimize=self.result1_path)
-            + np.einsum(
-                "ki,bkn,bnj->bij", self.W_QK, self.x, g_S, optimize=self.result2_path
-            )
-            + np.einsum(
-                "ik,bkn,bjn->bij", self.W_QK, self.x, g_S, optimize=self.result3_path
-            )
+            + np.einsum("bik,bjk->bij", g_OV, self.A)
+            + np.einsum("ki,bkn,bnj->bij", self.W_QK, self.x, g_S)
+            + np.einsum("ik,bkn,bjn->bij", self.W_QK, self.x, g_S)
         )
 
 
@@ -285,9 +182,6 @@ class Softmax(Layer):
 class CrossEntropy(Layer):
     def __init__(self):
         return
-
-    def precompute_einsum_paths(self, y_hat: np.ndarray, y: np.ndarray) -> None:
-        pass
 
     def forward(self, y_hat: np.ndarray, y: np.ndarray) -> float:
         """forward step for one batch
