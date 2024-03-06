@@ -345,6 +345,7 @@ class LinearLayer(Layer):
 
     def precompute_einsum_paths(self, x: np.ndarray):
         self.forward_path = np.einsum_path("od,bdn->bon", self.w, x, optimize="optimal")
+        self.param_path = np.einsum_path("bon,bdn->od", x, x, optimize="optimal")
         self.backward_path = np.einsum_path(
             "od,bon->bdn", self.w, x, optimize="optimal"
         )
@@ -384,7 +385,9 @@ class LinearLayer(Layer):
 
         # Compute gradient (average over B batches) of loss wrt weight w:
         # dL/dw = (1/B)*sum_b^B (grad_b@x_b^T)
-        self.params["w"]["d"] = np.einsum("bon,bdn->od", grad, self.x) / b
+        self.params["w"]["d"] = (
+            np.einsum("bon,bdn->od", grad, self.x, optimize=self.param_path) / b
+        )
 
         # Return gradient of loss wrt input of layer
         # dL/dx = w.T@grad
