@@ -117,7 +117,7 @@ class Attention(Layer):
         self.softmax = Softmax()
 
         # Precompute einsum paths
-        self.has_computed = False
+        self.has_precomputed = False
 
     def precompute_einsum_paths(self, x: np.ndarray) -> None:
         """Precomputes the optimal einsum path for all the einsums in
@@ -164,8 +164,9 @@ class Attention(Layer):
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         self.x = x
-        if not self.has_computed:
+        if not self.has_precomputed:
             self.precompute_einsum_paths(x)
+            self.has_precomputed = True
 
         # !TODO: Possible to extract it so we dont compute the same matrix over and over again?
         n = x.shape[2]
@@ -287,7 +288,7 @@ class CrossEntropy(Layer):
         self.has_precomputed = False
 
     def precompute_einsum_paths(self, y_hot: np.ndarray, y_hat: np.ndarray) -> None:
-        self.p_path = np.einsum_path("bij,bij->bj", y_hot, y_hat, optimize="optimal")
+        self.p_path = np.einsum_path("bij,bij->bj", y_hot, y_hat, optimize="optimal")[0]
 
     def forward(self, y_hat: np.ndarray, y: np.ndarray) -> float:
         """forward step for one batch
@@ -309,6 +310,7 @@ class CrossEntropy(Layer):
         # precompute einsum paths
         if not self.has_precomputed:
             self.precompute_einsum_paths(self.y_hot, self.y_hat)
+            self.has_precomputed = True
 
         # p = np.sum(np.einsum("bij,bij->bij", self.y_hot, y_hat))
         p = np.einsum(
@@ -341,14 +343,17 @@ class LinearLayer(Layer):
         # scaled with the init_scale
         self.w = np.random.randn(output_size, input_size) * init_scale
         self.params = {"w": {"w": self.w, "d": np.zeros_like(self.w)}}
-        self.has_computed = False
+        self.has_precomputed = False
 
     def precompute_einsum_paths(self, x: np.ndarray):
-        self.forward_path = np.einsum_path("od,bdn->bon", self.w, x, optimize="optimal")
-        self.param_path = np.einsum_path("bon,bdn->od", x, x, optimize="optimal")
+        self.forward_path = np.einsum_path(
+            "od,bdn->bon", self.w, x, optimize="optimal"
+        )[0]
+        self.param_path = np.einsum_path("bon,bdn->od", x, x, optimize="optimal")[0]
+        grad = np.random.randn(x.shape[0], self.w.shape[0], self.w.shape[1])
         self.backward_path = np.einsum_path(
-            "od,bon->bdn", self.w, x, optimize="optimal"
-        )
+            "od,bon->bdn", self.params["w"]["w"], grad, optimize="optimal"
+        )[0]
 
     def forward(self, x) -> np.ndarray:
         """
@@ -361,8 +366,9 @@ class LinearLayer(Layer):
         Returns:
             y: array of shape (batch_size, output_size, n) = (b,o,n)
         """
-        if not self.has_computed:
+        if not self.has_precomputed:
             self.precompute_einsum_paths(x)
+            self.has_precomputed = True
 
         self.x = x
 

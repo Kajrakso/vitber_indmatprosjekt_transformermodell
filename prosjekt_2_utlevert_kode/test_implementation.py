@@ -63,7 +63,8 @@ x = np.random.randint(0, m, (b, n_max))
 X = onehot(x, m)
 
 # we test with a y that is shorter than the maximum length
-n_y = n_max - 1
+# n_y = n_max - 1
+n_y = n_max
 y = np.random.randint(0, m, (b, n_y))
 
 # initialize a neural network based on the layers above
