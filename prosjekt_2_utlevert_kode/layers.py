@@ -284,10 +284,10 @@ class Softmax(Layer):
 
 class CrossEntropy(Layer):
     def __init__(self):
-        return
+        self.has_precomputed = False
 
-    def precompute_einsum_paths(self, y_hat: np.ndarray, y: np.ndarray) -> None:
-        pass
+    def precompute_einsum_paths(self, y_hot: np.ndarray, y_hat: np.ndarray) -> None:
+        self.p_path = np.einsum_path("bij,bij->bj", y_hot, y_hat, optimize="optimal")
 
     def forward(self, y_hat: np.ndarray, y: np.ndarray) -> float:
         """forward step for one batch
@@ -305,9 +305,14 @@ class CrossEntropy(Layer):
         self.n = n
         self.y_hot = onehot(y, m)
         self.y_hat = y_hat
+
+        # precompute einsum paths
+        if not self.has_precomputed:
+            self.precompute_einsum_paths(self.y_hot, self.y_hat)
+
         # p = np.sum(np.einsum("bij,bij->bij", self.y_hot, y_hat))
         p = np.einsum(
-            "bij,bij->bj", self.y_hot, self.y_hat
+            "bij,bij->bj", self.y_hot, self.y_hat, optimize=self.p_path
         )  # burde det ikkje vere slik?
         q = -np.log(p)
         return np.average(q)
