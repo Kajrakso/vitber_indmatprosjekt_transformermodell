@@ -1,5 +1,6 @@
 import numpy as np
 from utils import onehot
+from utils_numba import onehot_numba
 from numba.experimental import jitclass
 from numba import prange
 
@@ -283,37 +284,26 @@ class Softmax(Layer):
 
 class CrossEntropy(Layer):
     def __init__(self):
-        self.has_precomputed = False
-
-    def precompute_einsum_paths(self, y_hot: np.ndarray, y_hat: np.ndarray) -> None:
-        self.p_path = np.einsum_path("bij,bij->bj", y_hot, y_hat, optimize="optimal")[0]
+        return
 
     def forward(self, y_hat: np.ndarray, y: np.ndarray) -> float:
         """forward step for one batch
 
         Args:
-            y_hat (np.ndarray): the prediction matrix from the transformer model, dim (m, n)
-            y (np.ndarray): array of the correct solutions, dim (n)
+            y_hat (np.ndarray): the prediction matrix from the transformer model, dim (b, m, n)
+            y (np.ndarray): array of the correct solutions, dim (b, n)
 
         Returns:
             float: the average loss of the entire batch
         """
-        _, m, n = np.shape(y_hat)
-        # self.b = b
-        # self.m = m
+        b, m, n = np.shape(y_hat)
         self.n = n
-        self.y_hot = onehot(y, m)
+        self.y_hot = onehot_numba(y, m)
         self.y_hat = y_hat
-
-        # precompute einsum paths
-        if not self.has_precomputed:
-            self.precompute_einsum_paths(self.y_hot, self.y_hat)
-            self.has_precomputed = True
-
-        # p = np.sum(np.einsum("bij,bij->bij", self.y_hot, y_hat))
-        p = np.einsum(
-            "bij,bij->bj", self.y_hot, self.y_hat, optimize=self.p_path
-        )  # burde det ikkje vere slik?
+  
+        p = np.zeros((b, self.n))
+        for i in range(b):
+            p[i] = np.sum(self.y_hot[i]*self.y_hat[i], axis = 0)
         q = -np.log(p)
         return np.average(q)
 
