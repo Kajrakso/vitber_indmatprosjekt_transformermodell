@@ -99,16 +99,11 @@ class Attention(Layer):
         """
         super().__init__()
         # Initializes the four matrices to something random.
-        self.W_K = np.random.randn(k, d) / initial_scale
-        self.W_Q = np.random.randn(k, d) / initial_scale
+        self.W_K = np.random.randn(k, d) * initial_scale
+        self.W_Q = np.random.randn(k, d) * initial_scale
 
-        self.W_V = np.random.randn(k, d) / initial_scale
-        self.W_O = np.random.randn(k, d) / initial_scale
-
-        # self.W_K = np.zeros((k, d)) / initial_scale
-        # self.W_Q = np.zeros((k, d)) / initial_scale
-        # self.W_V = np.zeros((k, d)) / initial_scale
-        # self.W_O = np.zeros((k, d)) / initial_scale
+        self.W_V = np.random.randn(k, d) * initial_scale
+        self.W_O = np.random.randn(k, d) * initial_scale
 
         self.params = {
             "W_K": {"w": self.W_K, "d": np.zeros_like(self.W_K)},
