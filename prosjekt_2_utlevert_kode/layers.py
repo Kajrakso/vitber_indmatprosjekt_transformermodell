@@ -96,8 +96,6 @@ class Attention(Layer):
         """
         Args:
             (k, d): shape of parameter matrices.
-            n (int): size of input sequences
-
         """
         super().__init__()
         # Initializes the four matrices to something random.
@@ -106,6 +104,11 @@ class Attention(Layer):
 
         self.W_V = np.random.randn(k, d) / initial_scale
         self.W_O = np.random.randn(k, d) / initial_scale
+
+        # self.W_K = np.zeros((k, d)) / initial_scale
+        # self.W_Q = np.zeros((k, d)) / initial_scale
+        # self.W_V = np.zeros((k, d)) / initial_scale
+        # self.W_O = np.zeros((k, d)) / initial_scale
 
         self.params = {
             "W_K": {"w": self.W_K, "d": np.zeros_like(self.W_K)},
@@ -178,13 +181,11 @@ class Attention(Layer):
         # !TODO: Check if it is faster than inserting it into an einsum three times
         self.W_QK = self.W_Q.T @ self.W_K  # shape=(d, d)
 
-        # precompute einsum paths
-
         # z.T @ W_Q.T @ W_K @ z
         M = np.einsum(
             "bni,nm,bmj->bij", x, self.W_QK, x, out=None, optimize=self.M_path
         )  # shape=(b, n, n)
-        # !TODO: Possible to take the B out and just force the lower triangle of A to zero?
+        # !TODO: Possible to take the B out and just force the lower triangle of A to zero? (Probably no)
         self.A = self.softmax.forward(M + self.B)  # shape=(b, n, n)
 
         # z = x + W_O.T @ W_V @ x @ A
