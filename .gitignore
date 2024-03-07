@@ -7,6 +7,9 @@
 # Temporary test files
 **test.py
 
+# pickle dumps should not be under version control
+*.pkl
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
