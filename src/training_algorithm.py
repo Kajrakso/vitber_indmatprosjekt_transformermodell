@@ -49,7 +49,7 @@ def alg4(
         L = np.zeros(num_batches)
         for j in range(num_batches):
             Z = network.forward(onehot(x_train[j], m=num_ints))
-            L[j] = loss_func.forward(y_hat=Z[:, :, -n_y:], y=y_train[j])
+            L[j] = loss_func.forward(Z[:, :, -n_y:], y_train[j])
             grad_Z = loss_func.backward()
             _ = network.backward(grad_Z)
             _ = network.step_adam(alpha)
@@ -145,7 +145,7 @@ def main():
     # with open("nn_dump.pkl", "rb") as f:
     #     network = pickle.load(f)
 
-    loss = CrossEntropy()
+    loss = nl.CrossEntropy()
 
     # prepare training and test data for sorting
     training_data = get_train_test_sorting(

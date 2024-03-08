@@ -313,6 +313,15 @@ class Attention:
             param["w"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
 
 
+cross_entropy_specs = [
+    ("n", types.int64),
+    ("epsilon", types.float64),
+    ("y_hot", types.float64[:, :, :]),
+    ("y_hat", types.float64[:, :, :]),
+]
+
+
+@jitclass(cross_entropy_specs)
 class CrossEntropy(Layer):
     def __init__(self):
         return
@@ -331,10 +340,10 @@ class CrossEntropy(Layer):
         self.n = n
         self.y_hot = onehot_numba(y, m)
         self.y_hat = y_hat
-  
+
         p = np.zeros((b, self.n))
         for i in range(b):
-            p[i] = np.sum(self.y_hot[i]*self.y_hat[i], axis = 0)
+            p[i] = np.sum(self.y_hot[i] * self.y_hat[i], axis=0)
         q = -np.log(p)
         return np.average(q)
 
