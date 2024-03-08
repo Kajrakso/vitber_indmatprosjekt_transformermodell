@@ -5,7 +5,7 @@
 .vscode/
 
 # Temporary test files
-**test.py
+*/test.py
 
 # pickle dumps should not be under version control
 *.pkl
