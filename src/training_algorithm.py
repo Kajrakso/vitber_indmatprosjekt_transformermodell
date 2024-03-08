@@ -7,6 +7,7 @@ from layers import (
     FeedForward,
     Attention,
 )
+import layers_numba as nl
 from data_generators import get_train_test_sorting, get_train_test_addition
 import numpy as np
 from utils import onehot
@@ -108,13 +109,13 @@ def main():
     D = 250  # number of datapoint (x, y)
     b = 10  # number of batches
 
-    r = 5  # length of the sequences
+    r = 7  # length of the sequences
     n_max = 2 * r - 1
-    m = 2  # number of symbols
+    m = 5  # number of symbols
 
-    d = 10  # output dimension for the linear layer.
-    k = 5
-    p = 15
+    d = 20  # output dimension for the linear layer.
+    k = 10
+    p = 25
     L = 2
 
     n_iter = 300  # force the training to stop after n_iter steps.
@@ -141,6 +142,9 @@ def main():
         ]
     )
 
+    # with open("nn_dump.pkl", "rb") as f:
+    #     network = pickle.load(f)
+
     loss = CrossEntropy()
 
     # prepare training and test data for sorting
@@ -157,20 +161,21 @@ def main():
     y_test = training_data["y_test"]
 
     # train the network
-    # alg4(
-    # network=network,
-    # x_train=x_train,
-    # y_train=y_train,
-    # loss_func=loss,
-    # alpha=alpha,
-    # n_iter=n_iter,
-    # num_ints=m,
-    # dump_to_pickle_file=False
-    # )
+    alg4(
+        network=network,
+        x_train=x_train,
+        y_train=y_train,
+        loss_func=loss,
+        alpha=alpha,
+        n_iter=n_iter,
+        num_ints=m,
+        dump_to_pickle_file=False,
+    )
 
     # load nn from file
-    with open("nn_dump.pkl", "rb") as f:
-        network = pickle.load(f)
+    # with open("nn_dump.pkl", "rb") as f:
+    #     network = pickle.load(f)
+
     # test against test data:
     test_trained_network_sorting(
         network=network, x_test=x_test, y_test=y_test, num_ints=m
