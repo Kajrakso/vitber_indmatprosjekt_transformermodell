@@ -1,3 +1,4 @@
+import dill as pickle
 from layers import (
     LinearLayer,
     EmbedPosition,
@@ -6,6 +7,7 @@ from layers import (
     Softmax,
     Relu,
     CrossEntropy,
+    Layer,
 )
 import layers_numba as nl
 
@@ -17,9 +19,21 @@ class NeuralNetwork:
     as gradient descent step.
     """
 
-    def __init__(self, layers):
+    def __init__(self, layers: list):
         # layers is a list where each element is of the Layer class
         self.layers = layers
+
+    def numba_dump(self, filename: str) -> None:
+        dump_data = []
+        for layer in self.layers:
+            if not isinstance(
+                layer,
+                (Softmax, Relu, CrossEntropy, nl.Softmax, nl.Relu, nl.CrossEntropy),
+            ):
+                dump_data.append(layer.dump())
+
+        with open(filename, "wb") as f:
+            pickle.dump(dump_data, f)
 
     def forward(self, x):
         # Recursively perform forward pass from initial input x

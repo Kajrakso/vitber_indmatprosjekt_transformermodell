@@ -55,31 +55,32 @@ y_test = training_data["y_test"]
 
 network = init_neural_network(sort_params)
 
+network.numba_dump("numba_dump.pkl")
 
 loss = CrossEntropy()
 
-train_network(
-    network=network,
-    x_train=x_train,
-    y_train=y_train,
-    loss_func=loss,
-    alpha=sort_params["alpha"],
-    n_iter=sort_params["n_iter"],
-    num_ints=sort_params["m"],
-    dump_to_pickle_file=False,
-)
-train_network(
-    network=network,
-    x_train=x_train,
-    y_train=y_train,
-    loss_func=loss,
-    alpha=sort_params["alpha"] / 10,
-    n_iter=sort_params["n_iter"],
-    num_ints=sort_params["m"],
-    dump_to_pickle_file=False,
-)
+# train_network(
+#     network=network,
+#     x_train=x_train,
+#     y_train=y_train,
+#     loss_func=loss,
+#     alpha=sort_params["alpha"],
+#     n_iter=sort_params["n_iter"],
+#     num_ints=sort_params["m"],
+#     dump_to_pickle_file=False,
+# )
+# train_network(
+#     network=network,
+#     x_train=x_train,
+#     y_train=y_train,
+#     loss_func=loss,
+#     alpha=sort_params["alpha"] / 10,
+#     n_iter=sort_params["n_iter"],
+#     num_ints=sort_params["m"],
+#     dump_to_pickle_file=False,
+# )
 
 
-test_trained_network(
-    network=network, x_test=x_test, y_test=y_test, num_ints=sort_params["m"]
-)
+# test_trained_network(
+#     network=network, x_test=x_test, y_test=y_test, num_ints=sort_params["m"]
+# )
