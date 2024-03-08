@@ -1,4 +1,13 @@
-from layers import LinearLayer, EmbedPosition, FeedForward, Attention
+from layers import (
+    LinearLayer,
+    EmbedPosition,
+    FeedForward,
+    Attention,
+    Softmax,
+    Relu,
+    CrossEntropy,
+)
+import layers_numba as nl
 
 
 class NeuralNetwork:
@@ -37,7 +46,10 @@ class NeuralNetwork:
         """
         for layer in self.layers:
             # Check if layer is of class a class that has parameters
-            if isinstance(layer, (LinearLayer, EmbedPosition, FeedForward, Attention)):
+            if not isinstance(
+                layer,
+                (Softmax, Relu, CrossEntropy, nl.Softmax, nl.Relu, nl.CrossEntropy),
+            ):
                 layer.step_gd(alpha)
         return
 
@@ -48,6 +60,9 @@ class NeuralNetwork:
         """
         for layer in self.layers:
             # Check if layer is of class a class that has parameters
-            if isinstance(layer, (LinearLayer, EmbedPosition, FeedForward, Attention)):
+            if not isinstance(
+                layer,
+                (Softmax, Relu, CrossEntropy, nl.Softmax, nl.Relu, nl.CrossEntropy),
+            ):
                 layer.step_adam(alpha)
         return
