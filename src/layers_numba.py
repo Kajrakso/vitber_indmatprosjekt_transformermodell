@@ -292,46 +292,46 @@ class Attention:
 
         return grad + result1 + result2 + result3
 
-    # def step_gd(self, alpha: float) -> None:
-    #     """
-    #     Performs a gradient descent step given learning rate. The parameter matrices
-    #     are updated in-place.
-    #     Assumes that the layer has a parameter dictionary "params" on the form
+    def step_gd(self, alpha: float) -> None:
+        """
+        Performs a gradient descent step given learning rate. The parameter matrices
+        are updated in-place.
+        Assumes that the layer has a parameter dictionary "params" on the form
 
-    #     params = {
-    #         'w1': {
-    #             'w': w,         The parameter matrix
-    #             'd': d,         The gradient of loss wrt the parameter matrix
-    #             },
-    #         'w2': {....},
-    #     }
-    #     where each parameter has a key 'w' for weights and 'd' for gradients.
-    #     """
-    #     for param in self.params:
-    #         self.params[param]["w"] -= alpha * self.params[param]["d"]
+        params = {
+            'w1': {
+                'w': w,         The parameter matrix
+                'd': d,         The gradient of loss wrt the parameter matrix
+                },
+            'w2': {....},
+        }
+        where each parameter has a key 'w' for weights and 'd' for gradients.
+        """
+        for param in self.params:
+            self.params[param]["w"] -= alpha * self.params[param]["d"]
 
-    # def step_adam(self, alpha: float):
-    #     """
-    #     Performs a gradient descent step given learning rate. The parameter matrices
-    #     are updated in-place.
-    #     Assumes that the layer has a parameter dictionary "params" on the form
+    def step_adam(self, alpha: float):
+        """
+        Performs a gradient descent step given learning rate. The parameter matrices
+        are updated in-place.
+        Assumes that the layer has a parameter dictionary "params" on the form
 
-    #     params = {
-    #         'w1': {
-    #             'w': w,         The parameter matrix
-    #             'd': d,         The gradient of loss wrt the parameter matrix
-    #             },
-    #         'w2': {....},
-    #     }
-    #     where each parameter has a key 'w' for weights and 'd' for gradients.
-    #     """
-    #     for param in self.params.values():
-    #         G = param["d"]
-    #         M = self.beta_1 * self.adam_params["M"] + (1 - self.beta_1) * G
-    #         V = self.beta_2 * self.adam_params["V"] + (1 - self.beta_2) * G**2
-    #         M_hat = M / (1 - self.beta_1)
-    #         V_hat = V / (1 - self.beta_2)
-    #         param["w"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
+        params = {
+            'w1': {
+                'w': w,         The parameter matrix
+                'd': d,         The gradient of loss wrt the parameter matrix
+                },
+            'w2': {....},
+        }
+        where each parameter has a key 'w' for weights and 'd' for gradients.
+        """
+        for param in self.params.values():
+            G = param["d"]
+            M = self.beta_1 * self.adam_params["M"] + (1 - self.beta_1) * G
+            V = self.beta_2 * self.adam_params["V"] + (1 - self.beta_2) * G**2
+            M_hat = M / (1 - self.beta_1)
+            V_hat = V / (1 - self.beta_2)
+            param["w"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
 
 
 cross_entropy_specs = [
@@ -662,25 +662,25 @@ class EmbedPosition(Layer):
         # This is always the final layer, so we return None
         return None
 
-    # def step_gd(self, step_size):
-    #     # We need to call the step_gd method of the linear layer
-    #     self.embed.step_gd(step_size)
+    def step_gd(self, step_size):
+        # We need to call the step_gd method of the linear layer
+        self.embed.step_gd(step_size)
 
-    #     # And since we override step_gd(), we use super
-    #     # which calls the step_gd() of the base class
-    #     # and does gd for the paramters in the params dict
-    #     for param in self.params:
-    #         self.params[param]["w"] -= step_size * self.params[param]["d"]
+        # And since we override step_gd(), we use super
+        # which calls the step_gd() of the base class
+        # and does gd for the paramters in the params dict
+        for param in self.params:
+            self.params[param]["w"] -= step_size * self.params[param]["d"]
 
-    # def step_adam(self, alpha: float):
-    #     self.embed.step_adam(alpha)
-    #     for param in self.params.values():
-    #         G = param["d"]
-    #         M = self.beta_1 * self.adam_params["M"] + (1 - self.beta_1) * G
-    #         V = self.beta_2 * self.adam_params["V"] + (1 - self.beta_2) * G**2
-    #         M_hat = M / (1 - self.beta_1)
-    #         V_hat = V / (1 - self.beta_2)
-    #         param["w"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
+    def step_adam(self, alpha: float):
+        self.embed.step_adam(alpha)
+        for param in self.params.values():
+            G = param["d"]
+            M = self.beta_1 * self.adam_params["M"] + (1 - self.beta_1) * G
+            V = self.beta_2 * self.adam_params["V"] + (1 - self.beta_2) * G**2
+            M_hat = M / (1 - self.beta_1)
+            V_hat = V / (1 - self.beta_2)
+            param["w"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
 
 
 feedforward_specs = [
