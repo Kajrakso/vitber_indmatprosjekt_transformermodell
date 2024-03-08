@@ -1,7 +1,8 @@
 import numpy as np
 from utils import onehot
 from numba.experimental import jitclass
-from numba import prange
+from numba import types
+import numba as nl
 
 
 # Test if precomputing the optimal einsum-path has an effect on performance.
@@ -12,19 +13,15 @@ class Layer:
     Base class for layers in the neural network with forward and backward pass.
     """
 
-    epsilon = 1e-8
-    beta_1 = 0.9
-    beta_2 = 0.999
-
     def __init__(self):
         self.params: dict[str, dict[str, np.ndarray]] = dict()
         self.adam_params: dict[str, float] = {
             "M": 0,
             "V": 0,
         }
-
-    def multiply_matrices(self, *args) -> np.ndarray:
-        pass
+        self.epsilon = 1e-8
+        self.beta_1 = 0.9
+        self.beta_2 = 0.999
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         """Performs a forward pass of the layer.
@@ -93,13 +90,84 @@ class Layer:
             param["w"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
 
 
-class Attention(Layer):
+# Can not subclass when using numba
+
+softmax_specs = [
+    ("epsilon", types.float64),
+    ("beta_1", types.float64),
+    ("beta_2", types.float64),
+    ("P", types.float64[:, :, :]),
+    ("Q", types.float64[:, :, :]),
+    ("z", types.float64[:, :, :]),
+]
+
+
+@jitclass(softmax_specs)
+class Softmax(Layer):
+    def __init__(self):
+        self.epsilon = 1e-8
+        self.beta_1 = 0.9
+        self.beta_2 = 0.999
+
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        # #!TODO: Skrive om softmax (axis) til å være kompatibel med numba
+        # To prevent overflow, we use the trick given in the task description.
+        b, d, n = x.shape
+        max_x = np.zeros_like(x)
+        for i in range(b):
+            for col in range(n):
+                max_x[i, :, col] = np.max(x[i, :, col])
+
+        self.P = np.exp(x - max_x)
+
+        self.Q = np.zeros_like(x)
+        for i in range(b):
+            for col in range(n):
+                self.Q[i, :, col] = np.sum(self.P[i, :, col])
+        self.z = self.P / (self.Q + self.epsilon)
+        return self.z
+
+    def backward(self, grad: np.ndarray) -> np.ndarray:
+        S = self.P / (self.Q**2 + self.epsilon)
+        gS = grad * S
+        sum_gS = np.zeros_like(grad)
+        b, d, n = grad.shape
+        for i in range(b):
+            for col in range(n):
+                sum_gS[i, :, col] = np.sum(gS[i, :, col])
+        return grad * self.z - sum_gS * self.P
+
+
+attention_specs = [
+    ("W_K", types.float64[:, :]),
+    ("W_Q", types.float64[:, :]),
+    ("W_O", types.float64[:, :]),
+    ("W_V", types.float64[:, :]),
+    (
+        "params",
+        types.DictType(
+            types.unicode_type, types.DictType(types.unicode_type, types.float64[:, :])
+        ),
+    ),
+    ("softmax", nl.typeof(Softmax())),
+    ("adam_params", types.DictType(types.unicode_type, types.float64)),
+    ("epsilon", types.float64),
+    ("beta_1", types.float64),
+    ("beta_2", types.float64),
+    ("B", types.float64[:, :]),
+    ("W_QK", types.float64[:, :]),
+    ("x", types.float64[:, :, :]),
+    ("A", types.float64[:, :, :]),
+]
+
+
+@jitclass(attention_specs)
+class Attention:
     def __init__(self, k: int, d: int, initial_scale=0.1):
         """
         Args:
             (k, d): shape of parameter matrices.
         """
-        super().__init__()
         # Initializes the four matrices to something random.
         self.W_K = np.random.randn(k, d) * initial_scale
         self.W_Q = np.random.randn(k, d) * initial_scale
@@ -116,169 +184,132 @@ class Attention(Layer):
 
         self.softmax = Softmax()
 
-        # Precompute einsum paths
-        self.has_precomputed = False
-
-    def precompute_einsum_paths(self, x: np.ndarray) -> None:
-        """Precomputes the optimal einsum path for all the einsums in
-        both forward and backward pass.
-
-        Args:
-            x (np.ndarray[b, d, n]): The input x in order to get the input dimensions.
-        """
-        M = np.random.randn(x.shape[0], self.x.shape[2], x.shape[2])  # shape[b, n, n]
-        QK = self.W_Q.T @ self.W_K  # shape[d, d]
-
-        # Forward pass
-        self.M_path = np.einsum_path("bni,nm,bmj->bij", x, QK, x, optimize="optimal")[0]
-        self.forward_path = np.einsum_path(
-            "ki,km,bmn,bnj->bij", self.W_O, self.W_V, x, M, optimize="optimal"
-        )[0]
-
-        # Backward pass
-        self.g_OV_path = np.einsum_path(
-            "ki,km,bmj->bij", self.W_V, self.W_O, x, optimize="optimal"
-        )[0]
-        self.g_S_path = np.einsum_path("bki,bkj->bij", x, x, optimize="optimal")[0]
-
-        self.W_Kd_path = np.einsum_path(
-            "ik,bkn,bnm,bjm->ij", self.W_Q, x, M, x, optimize="optimal"
-        )[0]
-        self.W_Qd_path = np.einsum_path(
-            "ik,bkn,bmn,bjm->ij", self.W_K, x, M, x, optimize="optimal"
-        )[0]
-        self.W_Vd_path = np.einsum_path(
-            "ik,bkn,bmn,bjm->ij", self.W_O, x, M, x, optimize="optimal"
-        )[0]
-        self.W_Od_path = np.einsum_path(
-            "ik,bkn,bnm,bjm->ij", self.W_V, x, M, x, optimize="optimal"
-        )[0]
-
-        self.result1_path = np.einsum_path("bik,bjk->bij", x, M, optimize="optimal")[0]
-        self.result2_path = np.einsum_path(
-            "ki,bkn,bnj->bij", QK, x, M, optimize="optimal"
-        )[0]
-        self.result3_path = np.einsum_path(
-            "ik,bkn,bjn->bij", QK, x, M, optimize="optimal"
-        )[0]
+        self.adam_params: dict[str, float] = {
+            "M": 0,
+            "V": 0,
+        }
+        self.epsilon = 1e-8
+        self.beta_1 = 0.9
+        self.beta_2 = 0.999
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         self.x = x
-        if not self.has_precomputed:
-            self.precompute_einsum_paths(x)
-            self.has_precomputed = True
 
         # !TODO: Possible to extract it so we dont compute the same matrix over and over again?
-        n = x.shape[2]
+        batch_size, _, n = x.shape
         self.B = np.zeros((n, n))
-        i1, i2 = np.tril_indices(n, -1)
-        self.B[i1, i2] -= np.inf
+        # i1, i2 = np.tril_indices(n, -1)
+        # self.B[i1, i2] -= np.inf
+        for i in range(n):
+            for j in range(i):
+                self.B[i, j] = -np.inf
 
         # Is used again in the backward pass.
-        # !TODO: Check if it is faster than inserting it into an einsum three times
         self.W_QK = self.W_Q.T @ self.W_K  # shape=(d, d)
 
         # z.T @ W_Q.T @ W_K @ z
-        M = np.einsum(
-            "bni,nm,bmj->bij", x, self.W_QK, x, out=None, optimize=self.M_path
-        )  # shape=(b, n, n)
+        M = np.zeros((batch_size, n, n))  # shape[b, n, n]
+        for i in range(batch_size):
+            M[i] = self.x[i].T @ self.W_QK @ self.x[i]
+
         # !TODO: Possible to take the B out and just force the lower triangle of A to zero? (Probably no)
         self.A = self.softmax.forward(M + self.B)  # shape=(b, n, n)
 
         # z = x + W_O.T @ W_V @ x @ A
-        return x + np.einsum(
-            "ki,km,bmn,bnj->bij",
-            self.W_O,
-            self.W_V,
-            x,
-            self.A,
-            optimize=self.forward_path,
-        )
+        z_temp = np.zeros_like(x)
+        for i in range(batch_size):
+            z_temp[i] = self.W_O.T @ self.W_V @ x[i] @ self.A[i]
+
+        return x + z_temp
 
     def backward(self, grad: np.ndarray) -> np.ndarray:
-        b = grad.shape[0]
-        # shape[b, d, n]
-        g_OV = np.einsum(
-            "ki,km,bmj->bij", self.W_V, self.W_O, grad, optimize=self.g_OV_path
-        )
+        b, d, n = grad.shape
+
+        g_OV = np.zeros_like(grad)  # shape[b, d, n]
+        for i in range(b):
+            g_OV[i] = self.W_V.T @ self.W_O @ grad[i]
+
         # shape[b, n, n]
-        g_S = self.softmax.backward(
-            np.einsum("bki,bkj->bij", self.x, g_OV, optimize=self.g_S_path)
+        g_S_temp = np.zeros((b, n, n))
+        for i in range(b):
+            g_S_temp[i] = self.x[i].T @ g_OV[i]
+        g_S = self.softmax.backward(g_S_temp)
+
+        self.params["W_K"]["d"] = np.zeros_like(self.W_K)
+        self.params["W_Q"]["d"] = np.zeros_like(self.W_Q)
+        self.params["W_O"]["d"] = np.zeros_like(self.W_O)
+        self.params["W_V"]["d"] = np.zeros_like(self.W_V)
+
+        result1, result2, result3 = (
+            np.zeros_like(grad),
+            np.zeros_like(grad),
+            np.zeros_like(grad),
         )
 
-        self.params["W_K"]["d"] = (
-            np.einsum(
-                "ik,bkn,bnm,bjm->ij",
-                self.W_Q,
-                self.x,
-                g_S,
-                self.x,
-                optimize=self.W_Kd_path,
-            )
-            / b
-        )
-        self.params["W_Q"]["d"] = (
-            np.einsum(
-                "ik,bkn,bmn,bjm->ij",
-                self.W_K,
-                self.x,
-                g_S,
-                self.x,
-                optimize=self.W_Qd_path,
-            )
-            / b
-        )
+        for i in range(b):
+            # dL/dW
+            self.params["W_K"]["d"] += (self.W_Q @ self.x[i] @ g_S[i] @ self.x[i].T) / b
 
-        self.params["W_V"]["d"] = (
-            np.einsum(
-                "ik,bkn,bmn,bjm->ij",
-                self.W_O,
-                grad,
-                self.A,
-                self.x,
-                optimize=self.W_Vd_path,
-            )
-            / b
-        )
-        self.params["W_O"]["d"] = (
-            np.einsum(
-                "ik,bkn,bnm,bjm->ij",
-                self.W_V,
-                self.x,
-                self.A,
-                grad,
-                optimize=self.W_Od_path,
-            )
-            / b
-        )
+            self.params["W_Q"]["d"] += (
+                self.W_K @ self.x[i] @ g_S[i].T @ self.x[i].T
+            ) / b
 
-        # Note W_K.T @ W_Q = (W_Q.T @ W_K).T = W_QK.T
-        return (
-            grad
-            + np.einsum("bik,bjk->bij", g_OV, self.A, optimize=self.result1_path)
-            + np.einsum(
-                "ki,bkn,bnj->bij", self.W_QK, self.x, g_S, optimize=self.result2_path
-            )
-            + np.einsum(
-                "ik,bkn,bjn->bij", self.W_QK, self.x, g_S, optimize=self.result3_path
-            )
-        )
+            self.params["W_O"]["d"] += (
+                self.W_V @ self.x[i] @ self.A[i] @ grad[i].T
+            ) / b
 
+            self.params["W_V"]["d"] += (
+                self.W_O @ grad[i] @ self.A[i].T @ self.x[i].T
+            ) / b
 
-class Softmax(Layer):
-    def __init__(self):
-        return
+            # g_{l+1}
+            # Note W_K.T @ W_Q = (W_Q.T @ W_K).T = W_QK.T
+            result1[i] = g_OV[i] @ self.A[i].T
+            result2[i] = self.W_QK.T @ self.x[i] @ g_S[i]
+            result3[i] = self.W_QK @ self.x[i] @ g_S[i].T
 
-    def forward(self, x: np.ndarray) -> np.ndarray:
-        # To prevent overflow, we use the trick given in the task description.
-        self.P = np.exp(x - x.max(axis=1, keepdims=True))
-        self.Q = np.sum(self.P, axis=1, keepdims=True)
-        self.z = self.P / (self.Q + self.epsilon)
-        return self.z
+        return grad + result1 + result2 + result3
 
-    def backward(self, grad: np.ndarray) -> np.ndarray:
-        S = self.P / (self.Q * self.Q + self.epsilon)
-        return grad * self.z - np.sum(grad * S, axis=1, keepdims=True) * self.P
+    def step_gd(self, alpha: float) -> None:
+        """
+        Performs a gradient descent step given learning rate. The parameter matrices
+        are updated in-place.
+        Assumes that the layer has a parameter dictionary "params" on the form
+
+        params = {
+            'w1': {
+                'w': w,         The parameter matrix
+                'd': d,         The gradient of loss wrt the parameter matrix
+                },
+            'w2': {....},
+        }
+        where each parameter has a key 'w' for weights and 'd' for gradients.
+        """
+        for param in self.params:
+            self.params[param]["w"] -= alpha * self.params[param]["d"]
+
+    def step_adam(self, alpha: float):
+        """
+        Performs a gradient descent step given learning rate. The parameter matrices
+        are updated in-place.
+        Assumes that the layer has a parameter dictionary "params" on the form
+
+        params = {
+            'w1': {
+                'w': w,         The parameter matrix
+                'd': d,         The gradient of loss wrt the parameter matrix
+                },
+            'w2': {....},
+        }
+        where each parameter has a key 'w' for weights and 'd' for gradients.
+        """
+        for param in self.params.values():
+            G = param["d"]
+            M = self.beta_1 * self.adam_params["M"] + (1 - self.beta_1) * G
+            V = self.beta_2 * self.adam_params["V"] + (1 - self.beta_2) * G**2
+            M_hat = M / (1 - self.beta_1)
+            V_hat = V / (1 - self.beta_2)
+            param["w"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
 
 
 class CrossEntropy(Layer):
