@@ -25,12 +25,8 @@ class Layer:
         self.beta_2 = 0.999
         self.name = "Layer"
 
-    def dump(self) -> tuple[str, list]:
-        param_list = [self.params, self.adam_params]
-        return (self.name, param_list)
-
-    def load(self, input_data: tuple[str, list]) -> None:
-        self.params, self.adam_params = input_data[1]
+    def load(self) -> None:
+        raise NotImplementedError
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         """Performs a forward pass of the layer.
@@ -175,39 +171,27 @@ attention_specs = [
 
 @jitclass(attention_specs)
 class Attention(Layer):
-    def __init__(
-        self,
-        k: int,
-        d: int,
-        initial_scale=0.1,
-        load_data: tuple[str, list] | None = None,
-    ):
+    def __init__(self, k: int, d: int, initial_scale=0.1):
         """
         Args:
             (k, d): shape of parameter matrices.
         """
         self.name = "attention"
-        if load_data is not None:
-            self.load(load_data)
-            self.W_K = self.params["W_K"]["w"]
-            self.W_Q = self.params["W_Q"]["w"]
-            self.W_V = self.params["W_V"]["w"]
-            self.W_O = self.params["W_O"]["w"]
-        else:
-            self.adam_params = {
-                "M": 0.0,
-                "V": 0.0,
-            }
-            self.W_K = np.random.randn(k, d) * initial_scale
-            self.W_Q = np.random.randn(k, d) * initial_scale
-            self.W_V = np.random.randn(k, d) * initial_scale
-            self.W_O = np.random.randn(k, d) * initial_scale
-            self.params = {
-                "W_K": {"w": self.W_K, "d": np.zeros_like(self.W_K)},
-                "W_Q": {"w": self.W_Q, "d": np.zeros_like(self.W_Q)},
-                "W_V": {"w": self.W_V, "d": np.zeros_like(self.W_V)},
-                "W_O": {"w": self.W_O, "d": np.zeros_like(self.W_O)},
-            }
+        self.adam_params = {
+            "M": 0.0,
+            "V": 0.0,
+        }
+        self.W_K = np.random.randn(k, d) * initial_scale
+        self.W_Q = np.random.randn(k, d) * initial_scale
+        self.W_V = np.random.randn(k, d) * initial_scale
+        self.W_O = np.random.randn(k, d) * initial_scale
+
+        self.params = {
+            "W_K": {"w": self.W_K, "d": np.zeros_like(self.W_K)},
+            "W_Q": {"w": self.W_Q, "d": np.zeros_like(self.W_Q)},
+            "W_V": {"w": self.W_V, "d": np.zeros_like(self.W_V)},
+            "W_O": {"w": self.W_O, "d": np.zeros_like(self.W_O)},
+        }
 
         self.softmax = Softmax()
 
@@ -215,10 +199,19 @@ class Attention(Layer):
         self.beta_1 = 0.9
         self.beta_2 = 0.999
 
+    def load(
+        self, params: dict[str, dict[str, np.ndarray]], adam_params: dict[str, float]
+    ) -> None:
+        self.params = params
+        self.adam_params
+        self.W_K = self.params["W_K"]["w"]
+        self.W_Q = self.params["W_Q"]["w"]
+        self.W_V = self.params["W_V"]["w"]
+        self.W_O = self.params["W_O"]["w"]
+
     def forward(self, x: np.ndarray) -> np.ndarray:
         self.x = x
 
-        # !TODO: Possible to extract it so we dont compute the same matrix over and over again?
         batch_size, _, n = x.shape
         self.B = np.zeros((n, n))
         # i1, i2 = np.tril_indices(n, -1)
@@ -235,7 +228,6 @@ class Attention(Layer):
         for i in range(batch_size):
             M[i] = self.x[i].T @ self.W_QK @ self.x[i]
 
-        # !TODO: Possible to take the B out and just force the lower triangle of A to zero? (Probably no)
         self.A = self.softmax.forward(M + self.B)  # shape=(b, n, n)
 
         # z = x + W_O.T @ W_V @ x @ A
@@ -362,29 +354,19 @@ class LinearLayer(Layer):
     Linear Layer
     """
 
-    def __init__(
-        self,
-        input_size,
-        output_size,
-        init_scale=0.1,
-        load_data: tuple[str, list] | None = None,
-    ):
+    def __init__(self, input_size, output_size, init_scale=0.1):
         """
         Constructor takes input size and output size of layer
         and scale for the weights
         """
         self.name = "linear-layer"
-        if load_data is not None:
-            self.load(load_data)
-            self.w = self.params["w"]["w"]
-        else:
-            self.adam_params = {
-                "M": 0.0,
-                "V": 0.0,
-            }
-            # Initializes the four matrices to something random.
-            self.w = np.random.randn(output_size, input_size) * init_scale
-            self.params = {"w": {"w": self.w, "d": np.zeros_like(self.w)}}
+        self.adam_params = {
+            "M": 0.0,
+            "V": 0.0,
+        }
+        # Initializes the four matrices to something random.
+        self.w = np.random.randn(output_size, input_size) * init_scale
+        self.params = {"w": {"w": self.w, "d": np.zeros_like(self.w)}}
 
         self.epsilon = 1e-8
         self.beta_1 = 0.9
@@ -392,6 +374,11 @@ class LinearLayer(Layer):
 
         # Initialize weights using a sample from the normal distribution
         # scaled with the init_scale
+
+    def load(self, params, adam_params) -> None:
+        self.params = params
+        self.adam_params = adam_params
+        self.w = self.params["w"]["w"]
 
     def forward(self, x) -> np.ndarray:
         """
@@ -489,41 +476,39 @@ embed_specs = [
 
 @jitclass(embed_specs)
 class EmbedPosition(Layer):
-    def __init__(
-        self, n_max, m, d, init_scale=1e-1, load_data: tuple[str, list] | None = None
-    ):
+    def __init__(self, n_max, m, d, init_scale=1e-1):
         """
         n_max: maximum length of input sequence
         m: number of items in the vocabulary / number of integers
         d: embedding dimension
         """
         self.name = "embed-position"
-        if load_data is not None:
-            self.load(load_data)
-        else:
-            self.adam_params = {
-                "M": 0.0,
-                "V": 0.0,
-            }
-            # Initializes the four matrices to something random.
-            # Initialize a linear layer for the embedding
-            self.w = np.random.randn(d, n_max) * init_scale
-            # Initialize the position embedding matrix
-            self.embed = LinearLayer(m, d, init_scale, None)
-            self.params = {"Wp": {"w": self.w, "d": np.zeros_like(self.w)}}
+        self.adam_params = {
+            "M": 0.0,
+            "V": 0.0,
+        }
+        # Initializes the four matrices to something random.
+        # Initialize a linear layer for the embedding
+        self.w = np.random.randn(d, n_max) * init_scale
+        # Initialize the position embedding matrix
+        self.embed = LinearLayer(m, d, init_scale)
+        self.params = {"Wp": {"w": self.w, "d": np.zeros_like(self.w)}}
         self.epsilon = 1e-8
         self.beta_1 = 0.9
         self.beta_2 = 0.999
 
         # Initialize the parameter dictionary for weight with key "Wp"
 
-    def dump(self) -> tuple[str, list]:
-        param_list = [self.params, self.adam_params, self.embed.dump()]
-        return (self.name, param_list)
-
-    def load(self, load_data: tuple[str, list]):
-        self.params, self.adam_params, embed_data = load_data[1]
-        self.embed = LinearLayer(0, 0, 1, load_data)
+    def load(
+        self,
+        params: dict[str, dict[str, np.ndarray]],
+        adam_params: dict[str, float],
+        embed: LinearLayer,
+    ) -> None:
+        self.params = params
+        self.w = self.params["Wp"]["w"]
+        self.adam_params = adam_params
+        self.embed = embed
 
     def forward(self, X):
         """
@@ -581,34 +566,26 @@ feedforward_specs = [
 
 @jitclass(feedforward_specs)
 class FeedForward(Layer):
-    def __init__(self, d, p, init_scale=0.1, load_data: tuple[str, list] | None = None):
+    def __init__(self, d, p, init_scale=0.1):
         """
         Input:
             d: input dimension of first layer and output of second
             p: output dimension of first and input of second.
 
         """
-        self.name = "feedforward"
+        self.name = "feed-forward"
 
         # Initializes the four matrices to something random.
-        if load_data is not None:
-            self.load(load_data)
-        else:
-            # first linear layer with input size d and output size p
-            self.l1 = LinearLayer(d, p, init_scale, None)
-            # second linear layer with input size p and output size d
-            self.l2 = LinearLayer(p, d, init_scale, None)
+        # first linear layer with input size d and output size p
+        self.l1 = LinearLayer(d, p, init_scale)
+        # second linear layer with input size p and output size d
+        self.l2 = LinearLayer(p, d, init_scale)
         # We use the Relu activation function
         self.activation = Relu()
 
-    def dump(self) -> tuple[str, list]:
-        param_list = [self.l1.dump(), self.l2.dump()]
-        return (self.name, param_list)
-
-    def load(self, load_data):
-        l1_data, l2_data = load_data[1]
-        self.l1 = LinearLayer(1, 1, 1, l1_data)
-        self.l2 = LinearLayer(1, 1, 1, l2_data)
+    def load(self, l1: LinearLayer, l2: LinearLayer) -> None:
+        self.l1 = l1
+        self.l2 = l2
 
     def forward(self, x):
         """
