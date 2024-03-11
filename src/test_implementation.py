@@ -2,10 +2,10 @@ from layers import *
 from neural_network import NeuralNetwork
 from utils import onehot
 import numpy as np
-from data_generators import get_train_test_sorting, get_train_test_addition
-
 
 # --------------------
+
+
 # We choose some arbitrary values for the dimensions
 b = 6
 n_max = 7
@@ -22,9 +22,7 @@ y = np.random.randint(0, m, (b, n_max))
 
 # initialize the layers
 feed_forward = FeedForward(d=d, p=p)
-attention = Attention(
-    d=d, k=k
-)  # OBS: her har vi byttet rekkefølge på parameterliste i forhold til utdelt kode.
+attention = Attention(d=d, k=k)
 embed_pos = EmbedPosition(n_max=n_max, m=m, d=d)
 un_embed = LinearLayer(input_size=d, output_size=m)
 softmax = Softmax()
@@ -63,8 +61,7 @@ x = np.random.randint(0, m, (b, n_max))
 X = onehot(x, m)
 
 # we test with a y that is shorter than the maximum length
-# n_y = n_max - 1
-n_y = n_max
+n_y = n_max - 1
 y = np.random.randint(0, m, (b, n_y))
 
 # initialize a neural network based on the layers above
@@ -76,10 +73,14 @@ loss = CrossEntropy()
 Z = network.forward(X)
 
 # compute the loss
-L = loss.forward(Z, y)
+L = loss.forward(Z[:, :, -n_y:], y)             # Y_hat = Z[:, :, -n_y:]
 
 # get the derivative of the loss wrt Z
 grad_Z = loss.backward()
+
+# padding with zeros in order to fix dimensions
+pad_matrix = np.zeros((b, m, n_max - n_y))
+grad_Z = np.concatenate((pad_matrix, grad_Z), axis=2)
 
 # and perform a backward pass
 _ = network.backward(grad_Z)
@@ -87,6 +88,8 @@ _ = network.backward(grad_Z)
 # and and do a gradient descent step
 _ = network.step_gd(0.01)
 
+
+# -------------------
 
 """
 Here you may add additional tests to for example:
@@ -98,6 +101,7 @@ Here you may add additional tests to for example:
 This is voluntary, but could be useful.
 """
 
+# --------------------
 
 # check if loss is non-negative
 assert L >= 0, f"L={L}, expected L>=0"
