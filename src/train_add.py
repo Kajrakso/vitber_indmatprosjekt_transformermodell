@@ -10,7 +10,7 @@ def train():
     add_params = AddParams()
     add_params.b_train = 30
     add_params.n_iter = 50_000
-    add_params.L = 5
+    add_params.L = 3
 
     network = init_neural_network(add_params)
 
