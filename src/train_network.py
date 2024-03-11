@@ -47,7 +47,6 @@ def train_network(
     n_iter: int,
     num_ints: int,
     dump_to_pickle_file: bool = False,
-    is_numba_dump: bool = True,
     file_name_dump: str = "nn_dump.pkl",
 ) -> None:
     """optimizes the paramaters in the network using the Adam algorithm
@@ -61,7 +60,6 @@ def train_network(
         n_iter: number of iterations before the training ends
         num_ints: size of vocabulary (m in the project description)
         dump_to_pickle_file: bool
-        is_numba_dump: bool. True if numba is used
         file_name_dump: default is `nn_dump.pkl`
     """
     num_batches, batch_size, n = x_train.shape
@@ -84,13 +82,8 @@ def train_network(
             network.backward(grad_Z)
             network.step_adam(alpha)
 
-        # TODO: use NeuralNetwork's interface for dumping both python and numba layers.
         if dump_to_pickle_file:
-            if is_numba_dump:
-                network.numba_dump(file_name_dump)
-            else:
-                with open(file_name_dump, "wb") as f:
-                    pickle.dump(network, f)
+            network.dump(file_name_dump)
 
         print(f"{i+1:>15} | {np.mean(L):>15.10f}")
     print("\nend of training...\n")
