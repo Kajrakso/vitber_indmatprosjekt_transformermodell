@@ -47,6 +47,35 @@ def generate(net,start_idx,m,n_max,n_gen):
     return total_seq_idx
 
 
+def load_from_pkl_and_gen_text(filename:str) -> None:
+    #We can now generate text from an initial string
+    start_text = "Thou shall not"
+    start_idx = np.array([text_to_idx[ch] for ch in start_text])[None]
+
+    #length of the total text sequence we want to generate
+    n_gen = 10*text_params.n_max
+
+    generated_idx = generate(net,start_idx,m,text_params.n_max,n_gen)
+
+    text = ''.join([idx_to_text[idx] for idx in generated_idx[0]])
+    print(text)
+
+
+def train():
+    loss = CrossEntropy()
+    train_network.train_network(
+        network=net,
+        x_train=np.array(data["x_train"]),
+        y_train=np.array(data["y_train"]),
+        loss_func=loss,
+        alpha=text_params.alpha,
+        n_iter=text_params.n_iter,
+        num_ints=text_params.m,
+        dump_to_pickle_file=True,
+        file_name_dump="nn_dump_text_generation.pkl",
+    )
+
+
 if __name__ == "__main__":
     text_params = TextGenParams()
 
@@ -62,20 +91,11 @@ if __name__ == "__main__":
 
         print("\nExample of a sequence (idx): \n")
         print(data['x_train'][0][0])
-        
+
         text_params.m = m
     
     net = init_neural_network(text_params)
 
-    loss = CrossEntropy()
-    train_network.train_network(
-        network=net,
-        x_train=np.array(data["x_train"]),
-        y_train=np.array(data["y_train"]),
-        loss_func=loss,
-        alpha=text_params.alpha,
-        n_iter=text_params.n_iter,
-        num_ints=text_params.m,
-        dump_to_pickle_file=True,
-        file_name_dump="nn_dump_text_generation.pkl",
-    )
+
+    train()
+    load_from_pkl_and_gen_text("nn_dump_text_generation.pkl")
