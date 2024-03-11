@@ -58,6 +58,7 @@ class TextGenParams(BaseParams):
     b_train = 20
     b_test = 10
     n_max = 50
+    m = -1        # m has to be changed based on input file
     d = 80
     k = 25
     p = 100
