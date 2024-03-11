@@ -100,7 +100,7 @@ def train_network(
                 (pad_matrix, grad_Z), axis=2
             )  # pad grad_Z with zeros
             network.backward(grad_Z)
-            network.step_adam(alpha)
+            network.step_adam(alpha/i**0.5)
 
         if dump_to_pickle_file and i % 10 == 0:
             network.dump(file_name_dump)
