@@ -40,3 +40,25 @@ def get_training_params_addition() -> dict:
         'n_iter': 150   # number of iterations
     }
     return params
+
+
+def get_training_params_text_generation() -> dict:
+    """training parameters given in `text_generation.ipynb`"""
+    params = {
+        'D': 50,       # number of datapoint (x, y)
+        'b_train': 20,  # number of batches to train on
+        'b_test': 10,   # number of batches to test on
+        
+        'r': 2,         # number of digits
+        'n_max': 50,    #
+        'm': 0,        # number of symbols (0, 1, ..., 9)
+
+        'd': 80,        # output dimension for the linear layer.
+        'k': 25,        # dimension for attention step
+        'p': 100,        # dimensions for feed forward
+        'L': 2,         # number of transformer layers
+
+        'alpha': 0.001, # alpha paramater for Adam
+        'n_iter': 150   # number of iterations
+    }
+    return params
