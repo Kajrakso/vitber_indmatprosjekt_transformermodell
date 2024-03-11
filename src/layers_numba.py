@@ -23,7 +23,7 @@ class Layer:
         self.epsilon = 1e-8
         self.beta_1 = 0.9
         self.beta_2 = 0.999
-        self.name = "Layer"
+        self.name = "layer"
 
     def load(self) -> None:
         raise NotImplementedError
@@ -117,7 +117,6 @@ class Softmax(Layer):
         self.name = "softmax"
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        # #!TODO: Skrive om softmax (axis) til å være kompatibel med numba
         # To prevent overflow, we use the trick given in the task description.
         b, d, n = x.shape
         max_x = np.zeros_like(x)
