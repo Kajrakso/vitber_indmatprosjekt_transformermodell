@@ -47,7 +47,7 @@ class NeuralNetwork:
         with open(filename, "rb") as f:
             data = pickle.load(f)
         if data[0] == "numba":
-            self.layers = load_layers(data)
+            self.layers = load_layers(data[1])
         else:
             self.layers = data[1]
 
