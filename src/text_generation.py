@@ -102,5 +102,5 @@ if __name__ == "__main__":
     net = init_neural_network(text_params)
 
 
-    # train()
-    load_from_pkl_and_gen_text("nn_dump_text_generation.pkl")
+    train()
+    # load_from_pkl_and_gen_text("nn_dump_text_generation.pkl")
