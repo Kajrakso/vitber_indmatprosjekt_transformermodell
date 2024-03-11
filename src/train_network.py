@@ -6,8 +6,21 @@ from train_test_params import SortParams1, SortParams2, AddParams, TextGenParams
 from layers_numba import FeedForward, Attention, EmbedPosition, Softmax, LinearLayer
 
 
-def init_neural_network(t_params: SortParams1|SortParams2|AddParams|TextGenParams):
-    """t_params: instance of a parameter data class. see the dataclasses in `train_test_params.py`."""
+def init_neural_network(
+    t_params: SortParams1 | SortParams2 | AddParams | TextGenParams,
+) -> NeuralNetwork:
+    """Initializes a NeuralNetwork with the following layers:
+
+    EmbedPosition -> Transformer -> LinearLayer (unembedding) -> Softmax
+
+    Parameters are found in t_params.
+
+    Args:
+        t_params: See the dataclasses in `train_test_params.py`.
+
+    Returns:
+        an instance of NeuralNetwork"""
+
     transformer = [
         (
             FeedForward(d=t_params.d, p=t_params.p),
@@ -15,17 +28,16 @@ def init_neural_network(t_params: SortParams1|SortParams2|AddParams|TextGenParam
         )
         for _ in range(t_params.L)
     ]
-    embed_pos = EmbedPosition(
-        n_max=t_params.n_max, m=t_params.m, d=t_params.d
-    )
+
+    embed_pos = EmbedPosition(n_max=t_params.n_max, m=t_params.m, d=t_params.d)
+
     un_embed = LinearLayer(input_size=t_params.d, output_size=t_params.m)
+
     softmax = Softmax()
 
     network = NeuralNetwork(
         [
             embed_pos,
-
-            # don't even try to understand this...
             *[
                 t_layer
                 for transformer_layer in transformer
@@ -35,6 +47,7 @@ def init_neural_network(t_params: SortParams1|SortParams2|AddParams|TextGenParam
             softmax,
         ]
     )
+
     return network
 
 
@@ -46,7 +59,7 @@ def train_network(
     alpha: float,
     n_iter: int,
     num_ints: int,
-    dump_to_pickle_file: bool = False,
+    dump_to_pickle_file: bool = True,
     file_name_dump: str = "nn_dump.pkl",
 ) -> None:
     """optimizes the paramaters in the network using the Adam algorithm
@@ -59,7 +72,7 @@ def train_network(
         alpha: alpha paramater in the Adam algorithm (see p. 19, alg. 3)
         n_iter: number of iterations before the training ends
         num_ints: size of vocabulary (m in the project description)
-        dump_to_pickle_file: bool
+        dump_to_pickle_file: bool. Defaults to True
         file_name_dump: default is `nn_dump.pkl`
     """
     num_batches, batch_size, n = x_train.shape
@@ -78,7 +91,9 @@ def train_network(
             Z = network.forward(onehot(x_train[j], num_ints))
             L[j] = loss_func.forward(Z[:, :, -n_y:], y_train[j])
             grad_Z = loss_func.backward()
-            grad_Z = np.concatenate((pad_matrix, grad_Z), axis=2)   # pad grad_Z with zeros
+            grad_Z = np.concatenate(
+                (pad_matrix, grad_Z), axis=2
+            )  # pad grad_Z with zeros
             network.backward(grad_Z)
             network.step_adam(alpha)
 
