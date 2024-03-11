@@ -5,7 +5,7 @@ from train_test_params import *
 from train_network import init_neural_network
 import train_network
 from layers_numba import CrossEntropy
-
+import dill as pickle
 
 def generate(net,start_idx,m,n_max,n_gen):
     
@@ -48,6 +48,9 @@ def generate(net,start_idx,m,n_max,n_gen):
 
 
 def load_from_pkl_and_gen_text(filename:str) -> None:
+    net = init_neural_network(text_params)
+    net.load(filename)
+
     #We can now generate text from an initial string
     start_text = "Thou shall not"
     start_idx = np.array([text_to_idx[ch] for ch in start_text])[None]
@@ -63,7 +66,7 @@ def load_from_pkl_and_gen_text(filename:str) -> None:
 
 def train():
     loss = CrossEntropy()
-    train_network.train_network(
+    L = train_network.train_network(
         network=net,
         x_train=np.array(data["x_train"]),
         y_train=np.array(data["y_train"]),
@@ -74,6 +77,9 @@ def train():
         dump_to_pickle_file=True,
         file_name_dump="nn_dump_text_generation.pkl",
     )
+
+    with open("nn_dump_text_generation_L.pkl", "wb") as f:
+        pickle.dump(L, f)
 
 
 if __name__ == "__main__":
@@ -98,4 +104,4 @@ if __name__ == "__main__":
 
 
     train()
-    load_from_pkl_and_gen_text("nn_dump_text_generation.pkl")
+    # load_from_pkl_and_gen_text("nn_dump_text_generation.pkl")
