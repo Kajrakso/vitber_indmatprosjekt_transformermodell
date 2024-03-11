@@ -26,7 +26,14 @@ class NeuralNetwork:
         # layers is a list where each element is of the Layer class
         self.layers = layers
 
-    def numba_dump(self, filename: str) -> None:
+    def dump(self, filename: str) -> None:
+        if isinstance(self.layers[-1], nl.Softmax):
+            self._numba_dump(filename)
+        else:
+            with open(filename, "wb") as f:
+                pickle.dump(("normal", self.layers), f)
+
+    def _numba_dump(self, filename: str) -> None:
         dump_data = []
         for layer in self.layers:
             dump = dump_layer(layer)
