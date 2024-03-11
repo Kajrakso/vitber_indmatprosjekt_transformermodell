@@ -22,17 +22,23 @@ class Layer:
         }
 
     def precompute_einsum_paths(self):
+        """Precomputes the optimal einsum path for all the einsums in
+        both forward and backward pass.
+
+        Args:
+            x (np.ndarray[b, d, n]): The input x in order to get the input and output dimensions.
+        """
         raise NotImplementedError
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         """Performs a forward pass of the layer.
-        It also stores variables which will be used later in the backward pass.
+        It also stores variables to be used later in the backward pass.
 
         Args:
-            x (np.ndarray[b, d, n]): input matrix
+            x (np.ndarray[b, d, n]): Input matrix
 
         Returns:
-            np.ndarray[b, d, n]: the result of the forward pass
+            np.ndarray[b, d, n]: The result of the forward pass
         """
         raise NotImplementedError
 
@@ -122,7 +128,7 @@ class Attention(Layer):
         both forward and backward pass.
 
         Args:
-            x (np.ndarray[b, d, n]): The input x in order to get the input dimensions.
+            x (np.ndarray[b, d, n]): The input x in order to get the input and output dimensions.
         """
         M = np.random.randn(x.shape[0], self.x.shape[2], x.shape[2])  # shape[b, n, n]
         QK = self.W_Q.T @ self.W_K  # shape[d, d]
@@ -166,21 +172,18 @@ class Attention(Layer):
             self.precompute_einsum_paths(x)
             self.has_precomputed = True
 
-        # !TODO: Possible to extract it so we dont compute the same matrix over and over again?
         n = x.shape[2]
         self.B = np.zeros((n, n))
         i1, i2 = np.tril_indices(n, -1)
         self.B[i1, i2] -= np.inf
 
         # Is used again in the backward pass.
-        # !TODO: Check if it is faster than inserting it into an einsum three times
         self.W_QK = self.W_Q.T @ self.W_K  # shape=(d, d)
 
         # z.T @ W_Q.T @ W_K @ z
         M = np.einsum(
             "bni,nm,bmj->bij", x, self.W_QK, x, out=None, optimize=self.M_path
         )  # shape=(b, n, n)
-        # !TODO: Possible to take the B out and just force the lower triangle of A to zero? (Probably no)
         self.A = self.softmax.forward(M + self.B)  # shape=(b, n, n)
 
         # z = x + W_O.T @ W_V @ x @ A
