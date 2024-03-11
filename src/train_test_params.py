@@ -4,7 +4,7 @@ from dataclasses import dataclass
 class BaseParams():
     D = 250       # number of datapoint (x, y)
     b_train = 10  # number of batches to train on
-    b_test = 10   # number of batches to train on
+    b_test = 10   # number of batches to test on
         
     r = None      # length of input sequence
     n_max = None  # max length of input sequence
@@ -12,12 +12,12 @@ class BaseParams():
     
     m = None      # number of symbols
 
-    d = None      # output dimension for the linear layer.
-    k = None      # dimension for attention step
-    p = None      # dimensions for feed forward
-    L = None      # number of transformer layers
+    d = None      # dimension for vectors representing the input
+    k = None      # dimension for matrices in Attention
+    p = None      # dimension for matrices in FeedForward
+    L = None      # number of layers (FeedForward + Attention) in the transformer
 
-    alpha = 0.01  # alpha paramater for Adam
+    alpha = 0.01  # alpha parameter for Adam
     n_iter = 300  # number of iterations
 
 @dataclass
@@ -57,9 +57,7 @@ class TextGenParams(BaseParams):
     D = 50
     b_train = 20
     b_test = 10
-    r = 2
     n_max = 50
-    m = 0
     d = 80
     k = 25
     p = 100
