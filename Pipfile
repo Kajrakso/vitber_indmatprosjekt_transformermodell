@@ -10,6 +10,7 @@ numba = "*"
 ipykernel = "*"
 dill = "*"
 scipy = "*"
+nbdev = "*"
 
 [dev-packages]
 
