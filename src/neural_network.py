@@ -41,12 +41,15 @@ class NeuralNetwork:
             # dump = layer.dump()  # [Error] Can not dump from within the class
 
         with open(filename, "wb") as f:
-            pickle.dump(dump_data, f)
+            pickle.dump(("numba", dump_data), f)
 
     def load(self, filename: str):
         with open(filename, "rb") as f:
             data = pickle.load(f)
-        self.layers = load_layers(data)
+        if data[0] == "numba":
+            self.layers = load_layers(data)
+        else:
+            self.layers = data[1]
 
     def forward(self, x):
         # Recursively perform forward pass from initial input x
