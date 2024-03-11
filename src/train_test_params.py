@@ -1,86 +1,67 @@
-def get_training_params_sort_part_one() -> dict:
-    """training parameters as per part one of excersise 3.3 in proj. desc."""
-    training_params = {
-        'D': 250,       # number of datapoint (x, y)
-        'b_train': 10,  # number of batches to train on
-        'b_test': 10,   # number of batches to train on
+from dataclasses import dataclass
+
+@dataclass
+class BaseParams():
+    D = 250       # number of datapoint (x, y)
+    b_train = 10  # number of batches to train on
+    b_test = 10   # number of batches to train on
         
-        'r': 5,         # length of the sequences
-        'n_max': 9,     # 2*r - 1
-        'm': 2,         # number of symbols
+    r = None      # length of input sequence
+    n_max = None  # max length of input sequence
+    n_y = None    # length of output sequence
+    
+    m = None      # number of symbols
 
-        'd': 10,        # output dimension for the linear layer.
-        'k': 5,         # dimension for attention step
-        'p': 15,        # dimensions for feed forward
-        'L': 2,         # number of transformer layers
+    d = None      # output dimension for the linear layer.
+    k = None      # dimension for attention step
+    p = None      # dimensions for feed forward
+    L = None      # number of transformer layers
 
-        'alpha': 0.01,  # alpha paramater for Adam
-        'n_iter': 300   # number of iterations
-    }
-    return training_params
+    alpha = 0.01  # alpha paramater for Adam
+    n_iter = 300  # number of iterations
 
+@dataclass
+class SortParams1(BaseParams):
+    r = 5
+    n_max = 9       # 2*r - 1
+    m = 2
+    d = 10
+    k = 5
+    p = 15
+    L = 2 
 
-def get_training_params_sort() -> dict:
-    """training parameters as per part two of excersise 3.3 in proj. desc."""
-    training_params = {
-        'D': 250,       # number of datapoint (x, y)
-        'b_train': 10,  # number of batches to train on
-        'b_test': 10,   # number of batches to train on
-        
-        'r': 7,         # length of the sequences
-        'n_max': 13,    # 2*r - 1
-        'm': 5,         # number of symbols
+@dataclass
+class SortParams2(BaseParams):
+    r = 7
+    n_max = 13      # 2*r - 1
+    m = 5
+    d = 20
+    k = 10
+    p = 25
+    L = 2
 
-        'd': 20,        # output dimension for the linear layer.
-        'k': 10,        # dimension for attention step
-        'p': 25,        # dimensions for feed forward
-        'L': 2,         # number of transformer layers
+@dataclass
+class AddParams(BaseParams):
+    b_train = 20
+    r = 2
+    n_max = 6       # 3*r
+    m = 10
+    d = 30
+    k = 20
+    p = 40
+    L = 3
+    n_iter = 150
 
-        'alpha': 0.01,  # alpha paramater for Adam
-        'n_iter': 300   # number of iterations
-    }
-    return training_params
-
-
-def get_training_params_addition() -> dict:
-    """training parameters as per excersise 3.4 in proj. desc."""
-    params = {
-        'D': 250,       # number of datapoint (x, y)
-        'b_train': 20,  # number of batches to train on
-        'b_test': 10,   # number of batches to test on
-        
-        'r': 2,         # number of digits
-        'n_max': 6,     # 3 * r
-        'm': 10,        # number of symbols (0, 1, ..., 9)
-
-        'd': 30,        # output dimension for the linear layer.
-        'k': 20,        # dimension for attention step
-        'p': 40,        # dimensions for feed forward
-        'L': 3,         # number of transformer layers
-
-        'alpha': 0.01,  # alpha paramater for Adam
-        'n_iter': 150   # number of iterations
-    }
-    return params
-
-
-def get_training_params_text_generation() -> dict:
-    """training parameters given in `text_generation.ipynb`"""
-    params = {
-        'D': 50,        # number of datapoint (x, y)
-        'b_train': 20,  # number of batches to train on
-        'b_test': 10,   # number of batches to test on
-        
-        'r': 2,         # number of digits
-        'n_max': 50,    #
-        'm': 0,         # number of characters. has to be set after reading input file
-
-        'd': 80,        # output dimension for the linear layer.
-        'k': 25,        # dimension for attention step
-        'p': 100,       # dimensions for feed forward
-        'L': 2,         # number of transformer layers
-
-        'alpha': 0.01,  # alpha paramater for Adam
-        'n_iter': 150   # number of iterations
-    }
-    return params
+@dataclass
+class TextGenParams(BaseParams):
+    D = 50
+    b_train = 20
+    b_test = 10
+    r = 2
+    n_max = 50
+    m = 0
+    d = 80
+    k = 25
+    p = 100
+    L = 2
+    n_iter = 150
