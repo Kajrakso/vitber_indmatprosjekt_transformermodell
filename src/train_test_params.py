@@ -10,14 +10,14 @@ class BaseParams():
     n_max = None  # max length of input sequence
     n_y = None    # length of output sequence
     
-    m = None      # number of symbols
+    m = None      # number of symbols in the vocabulary
 
     d = None      # dimension for vectors representing the input
     k = None      # dimension for matrices in Attention
     p = None      # dimension for matrices in FeedForward
     L = None      # number of layers (FeedForward + Attention) in the transformer
 
-    alpha = 0.01  # alpha parameter for Adam
+    alpha = 0.001 # alpha parameter for Adam
     n_iter = 300  # number of iterations
 
 @dataclass
