@@ -15,11 +15,7 @@ class Layer:
     beta_2 = 0.999
 
     def __init__(self):
-        self.params: dict[str, dict[str, np.ndarray]] = dict()
-        self.adam_params: dict[str, float] = {
-            "M": 0,
-            "V": 0,
-        }
+        self.params: dict[str, dict[str, np.ndarray]]
 
     def precompute_einsum_paths(self):
         """Precomputes the optimal einsum path for all the einsums in
@@ -65,6 +61,8 @@ class Layer:
             'w1': {
                 'w': w,         The parameter matrix
                 'd': d,         The gradient of loss wrt the parameter matrix
+                'M': M,         Adam parameters
+                'V': V,         Adam parameters
                 },
             'w2': {....},
         }
@@ -83,6 +81,8 @@ class Layer:
             'w1': {
                 'w': w,         The parameter matrix
                 'd': d,         The gradient of loss wrt the parameter matrix
+                'M': M,         Adam parameters
+                'V': V,         Adam parameters
                 },
             'w2': {....},
         }
@@ -90,8 +90,10 @@ class Layer:
         """
         for param in self.params.values():
             G = param["d"]
-            M = self.beta_1 * self.adam_params["M"] + (1 - self.beta_1) * G
-            V = self.beta_2 * self.adam_params["V"] + (1 - self.beta_2) * G**2
+            M = self.beta_1 * param["M"] + (1 - self.beta_1) * G
+            V = self.beta_2 * param["V"] + (1 - self.beta_2) * G**2
+            param["M"] = M
+            param["V"] = V
             M_hat = M / (1 - self.beta_1)
             V_hat = V / (1 - self.beta_2)
             param["w"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
@@ -112,10 +114,30 @@ class Attention(Layer):
         self.W_O = np.random.randn(k, d) * initial_scale
 
         self.params = {
-            "W_K": {"w": self.W_K, "d": np.zeros_like(self.W_K)},
-            "W_Q": {"w": self.W_Q, "d": np.zeros_like(self.W_Q)},
-            "W_V": {"w": self.W_V, "d": np.zeros_like(self.W_V)},
-            "W_O": {"w": self.W_O, "d": np.zeros_like(self.W_O)},
+            "W_K": {
+                "w": self.W_K,
+                "d": np.zeros_like(self.W_K),
+                "M": np.zeros_like(self.W_K),
+                "V": np.zeros_like(self.W_K),
+            },
+            "W_Q": {
+                "w": self.W_Q,
+                "d": np.zeros_like(self.W_Q),
+                "M": np.zeros_like(self.W_Q),
+                "V": np.zeros_like(self.W_Q),
+            },
+            "W_V": {
+                "w": self.W_V,
+                "d": np.zeros_like(self.W_V),
+                "M": np.zeros_like(self.W_V),
+                "V": np.zeros_like(self.W_V),
+            },
+            "W_O": {
+                "w": self.W_O,
+                "d": np.zeros_like(self.W_O),
+                "M": np.zeros_like(self.W_O),
+                "V": np.zeros_like(self.W_O),
+            },
         }
 
         self.softmax = Softmax()
@@ -341,7 +363,14 @@ class LinearLayer(Layer):
         # Initialize weights using a sample from the normal distribution
         # scaled with the init_scale
         self.w = np.random.randn(output_size, input_size) * init_scale
-        self.params = {"w": {"w": self.w, "d": np.zeros_like(self.w)}}
+        self.params = {
+            "w": {
+                "w": self.w,
+                "d": np.zeros_like(self.w),
+                "M": np.zeros_like(self.w),
+                "V": np.zeros_like(self.w),
+            }
+        }
         self.has_precomputed = False
 
     def precompute_einsum_paths(self, x: np.ndarray):
@@ -437,7 +466,14 @@ class EmbedPosition(Layer):
         self.w = np.random.randn(d, n_max) * init_scale
 
         # Initialize the parameter dictionary for weight with key "Wp"
-        self.params = {"Wp": {"w": self.w, "d": np.zeros_like(self.w)}}
+        self.params = {
+            "Wp": {
+                "w": self.w,
+                "d": np.zeros_like(self.w),
+                "M": np.zeros_like(self.w),
+                "V": np.zeros_like(self.w),
+            }
+        }
 
     def forward(self, X):
         """
