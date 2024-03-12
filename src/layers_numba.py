@@ -16,16 +16,19 @@ class Layer:
 
     def __init__(self):
         self.params: dict[str, dict[str, np.ndarray]] = dict()
-        self.adam_params: dict[str, float] = {
-            "M": 0,
-            "V": 0,
-        }
         self.epsilon = 1e-8
         self.beta_1 = 0.9
         self.beta_2 = 0.999
         self.name = "layer"
 
-    def load(self) -> None:
+    def load(self, params: dict[str, dict[str, np.ndarray]]) -> None:
+        """Load in pregenerated parameters.
+        Used for loading pre-trained networks from a file.
+
+        Args:
+            `params` (dict[str, dict[str, np.ndarray]]): The parameters to use in the layer.
+            The type is actually the native python type converted to a numba compatible type.
+        """
         raise NotImplementedError
 
     def forward(self, x: np.ndarray) -> np.ndarray:
@@ -33,10 +36,10 @@ class Layer:
         It also stores variables which will be used later in the backward pass.
 
         Args:
-            x (np.ndarray[b, d, n]): input matrix
+            `x` (np.ndarray[b, d, n]): input matrix
 
         Returns:
-            np.ndarray[b, d, n]: the result of the forward pass
+            `np.ndarray[b, d, n]`: the result of the forward pass
         """
         raise NotImplementedError
 
@@ -46,10 +49,10 @@ class Layer:
         When computing wrt the input, it is done for each batch separately.
 
         Args:
-            grad (np.ndarray[b, d, n]): Gradient of loss wrt to the previous layer. [g_{i+1}]
+            `grad` (np.ndarray[b, d, n]): Gradient of loss wrt to the previous layer. [g_{i+1}]
 
         Returns:
-            np.ndarray[b, d, n]: Gradient of loss wrt to the input matrix. [g_i]
+            `np.ndarray[b, d, n]`: Gradient of loss wrt to the input matrix. [g_i]
         """
         raise NotImplementedError
 
@@ -63,6 +66,8 @@ class Layer:
             'w1': {
                 'w': w,         The parameter matrix
                 'd': d,         The gradient of loss wrt the parameter matrix
+                'M': M,         Adam parameters
+                'V': V,         Adam parameters
                 },
             'w2': {....},
         }
@@ -81,6 +86,8 @@ class Layer:
             'w1': {
                 'w': w,         The parameter matrix
                 'd': d,         The gradient of loss wrt the parameter matrix
+                'M': M,         Adam parameters
+                'V': V,         Adam parameters
                 },
             'w2': {....},
         }
@@ -88,8 +95,10 @@ class Layer:
         """
         for param in self.params.values():
             G = param["d"]
-            M = self.beta_1 * self.adam_params["M"] + (1 - self.beta_1) * G
-            V = self.beta_2 * self.adam_params["V"] + (1 - self.beta_2) * G**2
+            M = self.beta_1 * param["M"] + (1 - self.beta_1) * G
+            V = self.beta_2 * param["V"] + (1 - self.beta_2) * G**2
+            param["M"] = M
+            param["V"] = V
             M_hat = M / (1 - self.beta_1)
             V_hat = V / (1 - self.beta_2)
             param["w"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
@@ -156,7 +165,6 @@ attention_specs = [
         ),
     ),
     ("softmax", nm.typeof(Softmax())),
-    ("adam_params", types.DictType(types.unicode_type, types.float64)),
     ("epsilon", types.float64),
     ("beta_1", types.float64),
     ("beta_2", types.float64),
@@ -173,23 +181,39 @@ class Attention(Layer):
     def __init__(self, k: int, d: int, initial_scale=0.1):
         """
         Args:
-            (k, d): shape of parameter matrices.
+            `(k, d)`: shape of parameter matrices.
         """
         self.name = "attention"
-        self.adam_params = {
-            "M": 0.0,
-            "V": 0.0,
-        }
         self.W_K = np.random.randn(k, d) * initial_scale
         self.W_Q = np.random.randn(k, d) * initial_scale
         self.W_V = np.random.randn(k, d) * initial_scale
         self.W_O = np.random.randn(k, d) * initial_scale
 
         self.params = {
-            "W_K": {"w": self.W_K, "d": np.zeros_like(self.W_K)},
-            "W_Q": {"w": self.W_Q, "d": np.zeros_like(self.W_Q)},
-            "W_V": {"w": self.W_V, "d": np.zeros_like(self.W_V)},
-            "W_O": {"w": self.W_O, "d": np.zeros_like(self.W_O)},
+            "W_K": {
+                "w": self.W_K,
+                "d": np.zeros_like(self.W_K),
+                "M": np.zeros_like(self.W_K),
+                "V": np.zeros_like(self.W_K),
+            },
+            "W_Q": {
+                "w": self.W_Q,
+                "d": np.zeros_like(self.W_Q),
+                "M": np.zeros_like(self.W_Q),
+                "V": np.zeros_like(self.W_Q),
+            },
+            "W_V": {
+                "w": self.W_V,
+                "d": np.zeros_like(self.W_V),
+                "M": np.zeros_like(self.W_V),
+                "V": np.zeros_like(self.W_V),
+            },
+            "W_O": {
+                "w": self.W_O,
+                "d": np.zeros_like(self.W_O),
+                "M": np.zeros_like(self.W_O),
+                "V": np.zeros_like(self.W_O),
+            },
         }
 
         self.softmax = Softmax()
@@ -198,11 +222,8 @@ class Attention(Layer):
         self.beta_1 = 0.9
         self.beta_2 = 0.999
 
-    def load(
-        self, params: dict[str, dict[str, np.ndarray]], adam_params: dict[str, float]
-    ) -> None:
+    def load(self, params: dict[str, dict[str, np.ndarray]]) -> None:
         self.params = params
-        self.adam_params
         self.W_K = self.params["W_K"]["w"]
         self.W_Q = self.params["W_Q"]["w"]
         self.W_V = self.params["W_V"]["w"]
@@ -304,11 +325,11 @@ class CrossEntropy:
         """forward step for one batch
 
         Args:
-            y_hat (np.ndarray): the prediction matrix from the transformer model, dim (b, m, n)
-            y (np.ndarray): array of the correct solutions, dim (b, n)
+            `y_hat` (np.ndarray): the prediction matrix from the transformer model, dim (b, m, n)
+            `y` (np.ndarray): array of the correct solutions, dim (b, n)
 
         Returns:
-            float: the average loss of the entire batch
+            `float`: the average loss of the entire batch
         """
         b, m, n = np.shape(y_hat)
         self.n = n
@@ -325,7 +346,7 @@ class CrossEntropy:
         """backward step for cross entropy
 
         Returns:
-            np.ndarray: gradient wrt the prediciton from the transformer model
+            `np.ndarray`: gradient wrt the prediciton from the transformer model
         """
         return -(self.y_hot / (self.y_hat + self.epsilon)) / self.n
 
@@ -338,7 +359,6 @@ linear_specs = [
             types.unicode_type, types.DictType(types.unicode_type, types.float64[:, :])
         ),
     ),
-    ("adam_params", types.DictType(types.unicode_type, types.float64)),
     ("epsilon", types.float64),
     ("beta_1", types.float64),
     ("beta_2", types.float64),
@@ -359,13 +379,16 @@ class LinearLayer(Layer):
         and scale for the weights
         """
         self.name = "linear-layer"
-        self.adam_params = {
-            "M": 0.0,
-            "V": 0.0,
-        }
         # Initializes the four matrices to something random.
         self.w = np.random.randn(output_size, input_size) * init_scale
-        self.params = {"w": {"w": self.w, "d": np.zeros_like(self.w)}}
+        self.params = {
+            "w": {
+                "w": self.w,
+                "d": np.zeros_like(self.w),
+                "M": np.zeros_like(self.w),
+                "V": np.zeros_like(self.w),
+            }
+        }
 
         self.epsilon = 1e-8
         self.beta_1 = 0.9
@@ -374,9 +397,8 @@ class LinearLayer(Layer):
         # Initialize weights using a sample from the normal distribution
         # scaled with the init_scale
 
-    def load(self, params, adam_params) -> None:
+    def load(self, params) -> None:
         self.params = params
-        self.adam_params = adam_params
         self.w = self.params["w"]["w"]
 
     def forward(self, x) -> np.ndarray:
@@ -385,10 +407,10 @@ class LinearLayer(Layer):
         Stores input for backwards pass and returns output y = Wx.
 
         Args:
-            x: array of shape (batch_size, input_size, n) = (b,d,n)
+            `x`: array of shape (batch_size, input_size, n) = (b,d,n)
 
         Returns:
-            y: array of shape (batch_size, output_size, n) = (b,o,n)
+            `y`: array of shape (batch_size, output_size, n) = (b,o,n)
         """
         self.x = x
 
@@ -402,13 +424,6 @@ class LinearLayer(Layer):
         return y
 
     def backward(self, grad) -> np.ndarray:
-        # """
-        # Performs backward pass.
-
-        # Args:
-        #     grad: gradient of loss wrt output of layer, shape (batch_size, output_size, n) = (b,o,n)
-        # """
-
         b, d, n = grad.shape
         k, d = self.w.shape
 
@@ -465,7 +480,6 @@ embed_specs = [
         ),
     ),
     ("embed", nm.typeof(LinearLayer(4, 4))),
-    ("adam_params", types.DictType(types.unicode_type, types.float64)),
     ("epsilon", types.float64),
     ("beta_1", types.float64),
     ("beta_2", types.float64),
@@ -477,21 +491,24 @@ embed_specs = [
 class EmbedPosition(Layer):
     def __init__(self, n_max, m, d, init_scale=1e-1):
         """
-        n_max: maximum length of input sequence
-        m: number of items in the vocabulary / number of integers
-        d: embedding dimension
+        `n_max`: maximum length of input sequence
+        `m`: number of items in the vocabulary / number of integers
+        `d`: embedding dimension
         """
         self.name = "embed-position"
-        self.adam_params = {
-            "M": 0.0,
-            "V": 0.0,
-        }
         # Initializes the four matrices to something random.
         # Initialize a linear layer for the embedding
         self.w = np.random.randn(d, n_max) * init_scale
         # Initialize the position embedding matrix
         self.embed = LinearLayer(m, d, init_scale)
-        self.params = {"Wp": {"w": self.w, "d": np.zeros_like(self.w)}}
+        self.params = {
+            "Wp": {
+                "w": self.w,
+                "d": np.zeros_like(self.w),
+                "M": np.zeros_like(self.w),
+                "V": np.zeros_like(self.w),
+            }
+        }
         self.epsilon = 1e-8
         self.beta_1 = 0.9
         self.beta_2 = 0.999
@@ -501,21 +518,28 @@ class EmbedPosition(Layer):
     def load(
         self,
         params: dict[str, dict[str, np.ndarray]],
-        adam_params: dict[str, float],
         embed: LinearLayer,
     ) -> None:
+        """Load in pregenerated parameters.
+        Used for loading pre-trained networks from a file.
+
+        Args:
+            `params` (dict[str, dict[str, np.ndarray]]): The parameters to use in the layer.
+            The type is actually the native python type converted to a numba compatible type.
+
+            `embed` (LinearLayer): A pre-generated LinearLayer to use in this layer.
+        """
         self.params = params
         self.w = self.params["Wp"]["w"]
-        self.adam_params = adam_params
         self.embed = embed
 
     def forward(self, X):
         """
         Input:
-            X: one-hot encoded array of shape (b,m,n).
+            `X`: one-hot encoded array of shape (b,m,n).
 
         Output:
-            z_0: array of shape (b,d,n)
+            `z_0`: array of shape (b,d,n)
 
         embed.forward(X) maps (b,m,n) to (b,d,n).
         Assigns a column of size d to each integer in the sequence
@@ -553,6 +577,28 @@ class EmbedPosition(Layer):
         # This is always the final layer, so we return None
         return None
 
+    def step_gd(self, step_size):
+        # We need to call the step_gd method of the linear layer
+        self.embed.step_gd(step_size)
+
+        # and do gd for the parameters in the params dict
+        self.params["Wp"]["w"] -= step_size * self.params["Wp"]["d"]
+
+    def step_adam(self, alpha: float):
+        # Do step adam for the embed layer
+        self.embed.step_adam(alpha)
+
+        # Do step adam for the parameter matrix
+        param = self.params["Wp"]
+        G = param["d"]
+        M = self.beta_1 * param["M"] + (1 - self.beta_1) * G
+        V = self.beta_2 * param["V"] + (1 - self.beta_2) * G**2
+        param["M"] = M
+        param["V"] = V
+        M_hat = M / (1 - self.beta_1)
+        V_hat = V / (1 - self.beta_2)
+        param["w"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
+
 
 feedforward_specs = [
     ("x", types.float64[:, :, :]),
@@ -568,8 +614,8 @@ class FeedForward(Layer):
     def __init__(self, d, p, init_scale=0.1):
         """
         Input:
-            d: input dimension of first layer and output of second
-            p: output dimension of first and input of second.
+            `d`: input dimension of first layer and output of second
+            `p`: output dimension of first and input of second.
 
         """
         self.name = "feed-forward"
@@ -583,6 +629,13 @@ class FeedForward(Layer):
         self.activation = Relu()
 
     def load(self, l1: LinearLayer, l2: LinearLayer) -> None:
+        """Load in pregenerated parameters.
+        Used for loading pre-trained networks from a file.
+
+        Args:
+            `l1` (LinearLayer): A pre-generated LinearLayer to use as l1
+            `l2` (LinearLayer): A pre-generated LinearLayer to use as l2
+        """
         self.l1 = l1
         self.l2 = l2
 
