@@ -7,6 +7,10 @@ import train_network
 from layers_numba import CrossEntropy
 import dill as pickle
 
+
+DUMP_FILENAME = "nn_dump_text_gen.pkl"
+
+
 def generate(net,start_idx,m,n_max,n_gen):
     
     #We will concatenate all generated integers (idx) in total_seq_idx
@@ -75,10 +79,8 @@ def train():
         n_iter=text_params.n_iter,
         num_ints=text_params.m,
         dump_to_pickle_file=True,
-        file_name_dump="nn_dump_text_generation.pkl",
+        file_name_dump=DUMP_FILENAME,
     )
-
-    L.dump("nn_dump_text_generation_L.pkl")
 
 
 if __name__ == "__main__":
@@ -103,4 +105,4 @@ if __name__ == "__main__":
 
 
     train()
-    # load_from_pkl_and_gen_text("nn_dump_text_generation.pkl")
+    # load_from_pkl_and_gen_text(DUMP_FILENAME)
