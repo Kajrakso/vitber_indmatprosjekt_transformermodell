@@ -55,7 +55,7 @@ class AddParams(BaseParams):
 @dataclass
 class TextGenParams(BaseParams):
     D = 200
-    b_train = 500
+    b_train = 100
     b_test = 0
     n_max = 50
     m = -1        # m has to be changed based on input file
@@ -63,4 +63,4 @@ class TextGenParams(BaseParams):
     k = 25
     p = 100
     L = 5
-    n_iter = 150
+    n_iter = 20_000
