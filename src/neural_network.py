@@ -249,8 +249,8 @@ def convert_params_to_numba(params: dict[str, dict[str, np.ndarray]]) -> types.D
         key_type=types.unicode_type,
         value_type=types.DictType(types.unicode_type, types.float64[:, :]),
     )
-    sub_params = Dict.empty(key_type=types.unicode_type, value_type=types.float64[:, :])
     for key in params:
+        sub_params = Dict.empty(key_type=types.unicode_type, value_type=types.float64[:, :])
         W = params[key]["w"]
         d = params[key]["d"]
         sub_params["w"] = W
