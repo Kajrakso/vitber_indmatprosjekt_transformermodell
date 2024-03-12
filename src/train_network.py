@@ -24,8 +24,8 @@ def init_neural_network(
 
     transformer = [
         (
-            FeedForward(d=t_params.d, p=t_params.p),
             Attention(d=t_params.d, k=t_params.k),
+            FeedForward(d=t_params.d, p=t_params.p),
         )
         for _ in range(t_params.L)
     ]
@@ -102,13 +102,15 @@ def train_network(
             network.backward(grad_Z)
             network.step_adam(alpha)
 
-        if dump_to_pickle_file and i % 10 == 0:
-            network.dump(file_name_dump)
-
         L[i] = np.mean(L_batches)
         print(f"{i+1:>15} | {L[i]:>15.10f}")
 
+        if dump_to_pickle_file and (i+1) % 10 == 0:
+            print(f"network dumped at iteration {i+1}")
+            network.dump(file_name_dump)
+
         if L[i] < 0.01:
+            print("L < 0.01 so we break")
             break
 
     print("\nend of training...\n")
