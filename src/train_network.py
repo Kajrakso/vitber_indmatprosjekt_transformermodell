@@ -100,13 +100,16 @@ def train_network(
                 (pad_matrix, grad_Z), axis=2
             )  # pad grad_Z with zeros
             network.backward(grad_Z)
-            network.step_adam(1e-5 if alpha/(i+1)**0.5 < 1e-5 else alpha/(i+1)**0.5)
+            network.step_adam(alpha)
 
         if dump_to_pickle_file and i % 10 == 0:
             network.dump(file_name_dump)
 
         L[i] = np.mean(L_batches)
         print(f"{i+1:>15} | {L[i]:>15.10f}")
+
+        if L[i] < 0.01:
+            break
 
     print("\nend of training...\n")
     return L
