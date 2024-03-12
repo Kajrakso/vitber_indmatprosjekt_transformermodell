@@ -16,10 +16,6 @@ class Layer:
 
     def __init__(self):
         self.params: dict[str, dict[str, np.ndarray]] = dict()
-        self.adam_params: dict[str, float] = {
-            "M": 0,
-            "V": 0,
-        }
         self.epsilon = 1e-8
         self.beta_1 = 0.9
         self.beta_2 = 0.999
@@ -63,6 +59,8 @@ class Layer:
             'w1': {
                 'w': w,         The parameter matrix
                 'd': d,         The gradient of loss wrt the parameter matrix
+                'M': M,         Adam parameters
+                'V': V,         Adam parameters
                 },
             'w2': {....},
         }
@@ -81,6 +79,8 @@ class Layer:
             'w1': {
                 'w': w,         The parameter matrix
                 'd': d,         The gradient of loss wrt the parameter matrix
+                'M': M,         Adam parameters
+                'V': V,         Adam parameters
                 },
             'w2': {....},
         }
@@ -88,8 +88,10 @@ class Layer:
         """
         for param in self.params.values():
             G = param["d"]
-            M = self.beta_1 * self.adam_params["M"] + (1 - self.beta_1) * G
-            V = self.beta_2 * self.adam_params["V"] + (1 - self.beta_2) * G**2
+            M = self.beta_1 * param["M"] + (1 - self.beta_1) * G
+            V = self.beta_2 * param["V"] + (1 - self.beta_2) * G**2
+            param["M"] = M
+            param["V"] = V
             M_hat = M / (1 - self.beta_1)
             V_hat = V / (1 - self.beta_2)
             param["w"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
@@ -156,7 +158,6 @@ attention_specs = [
         ),
     ),
     ("softmax", nm.typeof(Softmax())),
-    ("adam_params", types.DictType(types.unicode_type, types.float64)),
     ("epsilon", types.float64),
     ("beta_1", types.float64),
     ("beta_2", types.float64),
@@ -176,20 +177,36 @@ class Attention(Layer):
             (k, d): shape of parameter matrices.
         """
         self.name = "attention"
-        self.adam_params = {
-            "M": 0.0,
-            "V": 0.0,
-        }
         self.W_K = np.random.randn(k, d) * initial_scale
         self.W_Q = np.random.randn(k, d) * initial_scale
         self.W_V = np.random.randn(k, d) * initial_scale
         self.W_O = np.random.randn(k, d) * initial_scale
 
         self.params = {
-            "W_K": {"w": self.W_K, "d": np.zeros_like(self.W_K)},
-            "W_Q": {"w": self.W_Q, "d": np.zeros_like(self.W_Q)},
-            "W_V": {"w": self.W_V, "d": np.zeros_like(self.W_V)},
-            "W_O": {"w": self.W_O, "d": np.zeros_like(self.W_O)},
+            "W_K": {
+                "w": self.W_K,
+                "d": np.zeros_like(self.W_K),
+                "M": np.zeros_like(self.W_K),
+                "V": np.zeros_like(self.W_K),
+            },
+            "W_Q": {
+                "w": self.W_Q,
+                "d": np.zeros_like(self.W_Q),
+                "M": np.zeros_like(self.W_Q),
+                "V": np.zeros_like(self.W_Q),
+            },
+            "W_V": {
+                "w": self.W_V,
+                "d": np.zeros_like(self.W_V),
+                "M": np.zeros_like(self.W_V),
+                "V": np.zeros_like(self.W_V),
+            },
+            "W_O": {
+                "w": self.W_O,
+                "d": np.zeros_like(self.W_O),
+                "M": np.zeros_like(self.W_O),
+                "V": np.zeros_like(self.W_O),
+            },
         }
 
         self.softmax = Softmax()
@@ -198,11 +215,8 @@ class Attention(Layer):
         self.beta_1 = 0.9
         self.beta_2 = 0.999
 
-    def load(
-        self, params: dict[str, dict[str, np.ndarray]], adam_params: dict[str, float]
-    ) -> None:
+    def load(self, params: dict[str, dict[str, np.ndarray]]) -> None:
         self.params = params
-        self.adam_params
         self.W_K = self.params["W_K"]["w"]
         self.W_Q = self.params["W_Q"]["w"]
         self.W_V = self.params["W_V"]["w"]
@@ -338,7 +352,6 @@ linear_specs = [
             types.unicode_type, types.DictType(types.unicode_type, types.float64[:, :])
         ),
     ),
-    ("adam_params", types.DictType(types.unicode_type, types.float64)),
     ("epsilon", types.float64),
     ("beta_1", types.float64),
     ("beta_2", types.float64),
@@ -359,13 +372,16 @@ class LinearLayer(Layer):
         and scale for the weights
         """
         self.name = "linear-layer"
-        self.adam_params = {
-            "M": 0.0,
-            "V": 0.0,
-        }
         # Initializes the four matrices to something random.
         self.w = np.random.randn(output_size, input_size) * init_scale
-        self.params = {"w": {"w": self.w, "d": np.zeros_like(self.w)}}
+        self.params = {
+            "w": {
+                "w": self.w,
+                "d": np.zeros_like(self.w),
+                "M": np.zeros_like(self.w),
+                "V": np.zeros_like(self.w),
+            }
+        }
 
         self.epsilon = 1e-8
         self.beta_1 = 0.9
@@ -376,7 +392,6 @@ class LinearLayer(Layer):
 
     def load(self, params, adam_params) -> None:
         self.params = params
-        self.adam_params = adam_params
         self.w = self.params["w"]["w"]
 
     def forward(self, x) -> np.ndarray:
@@ -465,7 +480,6 @@ embed_specs = [
         ),
     ),
     ("embed", nm.typeof(LinearLayer(4, 4))),
-    ("adam_params", types.DictType(types.unicode_type, types.float64)),
     ("epsilon", types.float64),
     ("beta_1", types.float64),
     ("beta_2", types.float64),
@@ -482,16 +496,19 @@ class EmbedPosition(Layer):
         d: embedding dimension
         """
         self.name = "embed-position"
-        self.adam_params = {
-            "M": 0.0,
-            "V": 0.0,
-        }
         # Initializes the four matrices to something random.
         # Initialize a linear layer for the embedding
         self.w = np.random.randn(d, n_max) * init_scale
         # Initialize the position embedding matrix
         self.embed = LinearLayer(m, d, init_scale)
-        self.params = {"Wp": {"w": self.w, "d": np.zeros_like(self.w)}}
+        self.params = {
+            "Wp": {
+                "w": self.w,
+                "d": np.zeros_like(self.w),
+                "M": np.zeros_like(self.w),
+                "V": np.zeros_like(self.w),
+            }
+        }
         self.epsilon = 1e-8
         self.beta_1 = 0.9
         self.beta_2 = 0.999
@@ -501,12 +518,10 @@ class EmbedPosition(Layer):
     def load(
         self,
         params: dict[str, dict[str, np.ndarray]],
-        adam_params: dict[str, float],
         embed: LinearLayer,
     ) -> None:
         self.params = params
         self.w = self.params["Wp"]["w"]
-        self.adam_params = adam_params
         self.embed = embed
 
     def forward(self, X):
@@ -552,6 +567,28 @@ class EmbedPosition(Layer):
 
         # This is always the final layer, so we return None
         return None
+
+    def step_gd(self, step_size):
+        # We need to call the step_gd method of the linear layer
+        self.embed.step_gd(step_size)
+
+        # and do gd for the parameters in the params dict
+        self.params["Wp"]["w"] -= step_size * self.params["Wp"]["d"]
+
+    def step_adam(self, alpha: float):
+        # Do step adam for the embed layer
+        self.embed.step_adam(alpha)
+
+        # Do step adam for the parameter matrix
+        param = self.params["Wp"]
+        G = param["d"]
+        M = self.beta_1 * param["M"] + (1 - self.beta_1) * G
+        V = self.beta_2 * param["V"] + (1 - self.beta_2) * G**2
+        param["M"] = M
+        param["V"] = V
+        M_hat = M / (1 - self.beta_1)
+        V_hat = V / (1 - self.beta_2)
+        param["w"] -= alpha * (M_hat / (np.sqrt(V_hat) + self.epsilon))
 
 
 feedforward_specs = [
