@@ -589,6 +589,7 @@ class EmbedPosition(Layer):
         self.embed.step_adam(alpha)
 
         # Do step adam for the parameter matrix
+        # Because we are using numba, inheritance is quite cumbersome to work with
         param = self.params["Wp"]
         G = param["d"]
         M = self.beta_1 * param["M"] + (1 - self.beta_1) * G
