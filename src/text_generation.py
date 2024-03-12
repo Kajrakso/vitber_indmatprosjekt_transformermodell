@@ -86,7 +86,7 @@ def train():
 if __name__ == "__main__":
     text_params = TextGenParams()
 
-    with open('input.txt', 'r') as f:
+    with open('spear.txt', 'r') as f:
         text = f.read()
         data,idx_to_text,text_to_idx, m = text_to_training_data(text_params.n_max,text,num_batches=text_params.b_train,batch_size=text_params.D)
 
