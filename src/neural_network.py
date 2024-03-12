@@ -179,8 +179,7 @@ def generic_dump(layer: nl.Layer) -> tuple[str, list]:
     # Note: Each conversion has to make a copy of the data, and is
     # therefore quite expensive.
     params = convert_params_to_python(layer.params)
-    adam_params = convert_adam_params_to_python(layer.adam_params)
-    return (layer.name, [params, adam_params])
+    return (layer.name, [params])
 
 
 def feedforward_dump(layer: nl.FeedForward) -> tuple[str, list]:
@@ -211,8 +210,7 @@ def embedpostition_dump(layer: nl.EmbedPosition) -> tuple[str, list]:
     """
     embed_dump = generic_dump(layer.embed)
     params = convert_params_to_python(layer.params)
-    adam_params = convert_adam_params_to_python(layer.adam_params)
-    return (layer.name, [params, adam_params, embed_dump])
+    return (layer.name, [params, embed_dump])
 
 
 def convert_params_to_python(
@@ -232,7 +230,14 @@ def convert_params_to_python(
     for key in params:
         W = params[key]["w"]
         d = params[key]["d"]
-        new_params[key] = {"w": np.asarray(W), "d": np.asarray(d)}
+        M = params[key]["M"]
+        V = params[key]["V"]
+        new_params[key] = {
+            "w": np.asarray(W),
+            "d": np.asarray(d),
+            "M": np.asarray(M),
+            "V": np.asarray(V),
+        }
     return new_params
 
 
@@ -250,42 +255,20 @@ def convert_params_to_numba(params: dict[str, dict[str, np.ndarray]]) -> types.D
         value_type=types.DictType(types.unicode_type, types.float64[:, :]),
     )
     for key in params:
-        sub_params = Dict.empty(key_type=types.unicode_type, value_type=types.float64[:, :])
+        sub_params = Dict.empty(
+            key_type=types.unicode_type, value_type=types.float64[:, :]
+        )
         W = params[key]["w"]
         d = params[key]["d"]
+        M = params[key]["M"]
+        V = params[key]["V"]
         sub_params["w"] = W
         sub_params["d"] = d
+        sub_params["M"] = M
+        sub_params["V"] = V
+
         new_params[key] = sub_params
     return new_params
-
-
-def convert_adam_params_to_python(adam_params: dict[str, float]) -> dict[str, float]:
-    """Convert the adam_params-dictionary from numba-types to
-    native python, so it can be serialized.
-    Creates a copy of all the data.
-
-    Args:
-        adam_params (dict[str, dict[str, np.ndarray]]): The dict to convert.
-
-    Returns:
-        dict[str, dict[str, np.ndarray]]: A copied and converted dictionary
-    """
-    return {"M": float(adam_params["M"]), "V": float(adam_params["V"])}
-
-
-def convert_adam_params_to_numba(adam_params: dict[str, float]) -> types.DictType:
-    """Convert adam_parameters-dict from a pure python type to a numba supported type.
-
-    Args:
-        adam_params (dict[str, dict[str, np.ndarray]]): The dict to convert
-
-    Returns:
-        types.DictType: The numba-compatible version of the dict
-    """
-    params = Dict.empty(key_type=types.unicode_type, value_type=types.float64)
-    params["M"] = adam_params["M"]
-    params["V"] = adam_params["V"]
-    return params
 
 
 def load_numba_layers(input_data: list[tuple[str, list]]) -> list[nl.Layer]:
@@ -329,11 +312,10 @@ def generic_load(
     Returns:
         nl.Attention | nl.LinearLayer: The reconstructed layer
     """
-    params, adam_params = input_data[1]
+    params, *_ = input_data[1]
     params = convert_params_to_numba(params)
-    adam_params = convert_adam_params_to_numba(adam_params)
     layer = layer_type(0, 0)
-    layer.load(params, adam_params)
+    layer.load(params)
     return layer
 
 
@@ -363,10 +345,9 @@ def embed_position_load(input_data: tuple[str, list]) -> nl.EmbedPosition:
     Returns:
         nl.FeedForward: The reconstructed network
     """
-    params, adam_params, embed_data = input_data[1]
+    params, embed_data = input_data[1]
     params = convert_params_to_numba(params)
-    adam_params = convert_adam_params_to_numba(adam_params)
     layer = nl.EmbedPosition(0, 0, 0)
     embed = generic_load(embed_data, nl.LinearLayer)
-    layer.load(params, adam_params, embed)
+    layer.load(params, embed)
     return layer
