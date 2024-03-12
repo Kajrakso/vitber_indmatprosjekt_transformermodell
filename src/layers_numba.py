@@ -21,7 +21,14 @@ class Layer:
         self.beta_2 = 0.999
         self.name = "layer"
 
-    def load(self) -> None:
+    def load(self, params: dict[str, dict[str, np.ndarray]]) -> None:
+        """Load in pregenerated parameters.
+        Used for loading pre-trained networks from a file.
+
+        Args:
+            `params` (dict[str, dict[str, np.ndarray]]): The parameters to use in the layer.
+            The type is actually the native python type converted to a numba compatible type.
+        """
         raise NotImplementedError
 
     def forward(self, x: np.ndarray) -> np.ndarray:
@@ -29,10 +36,10 @@ class Layer:
         It also stores variables which will be used later in the backward pass.
 
         Args:
-            x (np.ndarray[b, d, n]): input matrix
+            `x` (np.ndarray[b, d, n]): input matrix
 
         Returns:
-            np.ndarray[b, d, n]: the result of the forward pass
+            `np.ndarray[b, d, n]`: the result of the forward pass
         """
         raise NotImplementedError
 
@@ -42,10 +49,10 @@ class Layer:
         When computing wrt the input, it is done for each batch separately.
 
         Args:
-            grad (np.ndarray[b, d, n]): Gradient of loss wrt to the previous layer. [g_{i+1}]
+            `grad` (np.ndarray[b, d, n]): Gradient of loss wrt to the previous layer. [g_{i+1}]
 
         Returns:
-            np.ndarray[b, d, n]: Gradient of loss wrt to the input matrix. [g_i]
+            `np.ndarray[b, d, n]`: Gradient of loss wrt to the input matrix. [g_i]
         """
         raise NotImplementedError
 
@@ -174,7 +181,7 @@ class Attention(Layer):
     def __init__(self, k: int, d: int, initial_scale=0.1):
         """
         Args:
-            (k, d): shape of parameter matrices.
+            `(k, d)`: shape of parameter matrices.
         """
         self.name = "attention"
         self.W_K = np.random.randn(k, d) * initial_scale
@@ -318,11 +325,11 @@ class CrossEntropy:
         """forward step for one batch
 
         Args:
-            y_hat (np.ndarray): the prediction matrix from the transformer model, dim (b, m, n)
-            y (np.ndarray): array of the correct solutions, dim (b, n)
+            `y_hat` (np.ndarray): the prediction matrix from the transformer model, dim (b, m, n)
+            `y` (np.ndarray): array of the correct solutions, dim (b, n)
 
         Returns:
-            float: the average loss of the entire batch
+            `float`: the average loss of the entire batch
         """
         b, m, n = np.shape(y_hat)
         self.n = n
@@ -339,7 +346,7 @@ class CrossEntropy:
         """backward step for cross entropy
 
         Returns:
-            np.ndarray: gradient wrt the prediciton from the transformer model
+            `np.ndarray`: gradient wrt the prediciton from the transformer model
         """
         return -(self.y_hot / (self.y_hat + self.epsilon)) / self.n
 
@@ -390,7 +397,7 @@ class LinearLayer(Layer):
         # Initialize weights using a sample from the normal distribution
         # scaled with the init_scale
 
-    def load(self, params, adam_params) -> None:
+    def load(self, params) -> None:
         self.params = params
         self.w = self.params["w"]["w"]
 
@@ -400,10 +407,10 @@ class LinearLayer(Layer):
         Stores input for backwards pass and returns output y = Wx.
 
         Args:
-            x: array of shape (batch_size, input_size, n) = (b,d,n)
+            `x`: array of shape (batch_size, input_size, n) = (b,d,n)
 
         Returns:
-            y: array of shape (batch_size, output_size, n) = (b,o,n)
+            `y`: array of shape (batch_size, output_size, n) = (b,o,n)
         """
         self.x = x
 
@@ -417,13 +424,6 @@ class LinearLayer(Layer):
         return y
 
     def backward(self, grad) -> np.ndarray:
-        # """
-        # Performs backward pass.
-
-        # Args:
-        #     grad: gradient of loss wrt output of layer, shape (batch_size, output_size, n) = (b,o,n)
-        # """
-
         b, d, n = grad.shape
         k, d = self.w.shape
 
@@ -491,9 +491,9 @@ embed_specs = [
 class EmbedPosition(Layer):
     def __init__(self, n_max, m, d, init_scale=1e-1):
         """
-        n_max: maximum length of input sequence
-        m: number of items in the vocabulary / number of integers
-        d: embedding dimension
+        `n_max`: maximum length of input sequence
+        `m`: number of items in the vocabulary / number of integers
+        `d`: embedding dimension
         """
         self.name = "embed-position"
         # Initializes the four matrices to something random.
@@ -520,6 +520,15 @@ class EmbedPosition(Layer):
         params: dict[str, dict[str, np.ndarray]],
         embed: LinearLayer,
     ) -> None:
+        """Load in pregenerated parameters.
+        Used for loading pre-trained networks from a file.
+
+        Args:
+            `params` (dict[str, dict[str, np.ndarray]]): The parameters to use in the layer.
+            The type is actually the native python type converted to a numba compatible type.
+
+            `embed` (LinearLayer): A pre-generated LinearLayer to use in this layer.
+        """
         self.params = params
         self.w = self.params["Wp"]["w"]
         self.embed = embed
@@ -527,10 +536,10 @@ class EmbedPosition(Layer):
     def forward(self, X):
         """
         Input:
-            X: one-hot encoded array of shape (b,m,n).
+            `X`: one-hot encoded array of shape (b,m,n).
 
         Output:
-            z_0: array of shape (b,d,n)
+            `z_0`: array of shape (b,d,n)
 
         embed.forward(X) maps (b,m,n) to (b,d,n).
         Assigns a column of size d to each integer in the sequence
@@ -605,8 +614,8 @@ class FeedForward(Layer):
     def __init__(self, d, p, init_scale=0.1):
         """
         Input:
-            d: input dimension of first layer and output of second
-            p: output dimension of first and input of second.
+            `d`: input dimension of first layer and output of second
+            `p`: output dimension of first and input of second.
 
         """
         self.name = "feed-forward"
@@ -620,6 +629,13 @@ class FeedForward(Layer):
         self.activation = Relu()
 
     def load(self, l1: LinearLayer, l2: LinearLayer) -> None:
+        """Load in pregenerated parameters.
+        Used for loading pre-trained networks from a file.
+
+        Args:
+            `l1` (LinearLayer): A pre-generated LinearLayer to use as l1
+            `l2` (LinearLayer): A pre-generated LinearLayer to use as l2
+        """
         self.l1 = l1
         self.l2 = l2
 
