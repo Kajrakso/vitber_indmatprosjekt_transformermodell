@@ -108,6 +108,7 @@ def train_network(
         if dump_to_pickle_file and (i+1) % 10 == 0:
             print(f"network dumped at iteration {i+1}")
             network.dump(file_name_dump)
+            L.dump(f"L_{file_name_dump}")
 
         if L[i] < 0.01:
             print("L < 0.01 so we break")
