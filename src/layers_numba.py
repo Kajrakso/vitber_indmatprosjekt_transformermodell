@@ -1,12 +1,16 @@
 import numpy as np
-from utils import onehot
 from utils_numba import onehot_numba
 from numba.experimental import jitclass
 from numba import types
 import numba as nm
 
 
-# Test if precomputing the optimal einsum-path has an effect on performance.
+# --------------------------------------------------------------------
+# A rewrite of layers.py in order to utilize numba to speed things up.
+# Most notably have all einsum calls been written out into for-loops
+# and "pure" matrix multiplication. Some unsupported numpy functions
+# have also been rewritten.
+# --------------------------------------------------------------------
 
 
 class Layer:
