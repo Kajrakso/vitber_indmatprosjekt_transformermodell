@@ -1,14 +1,13 @@
 # vitber_indmatprosjekt_transformermodell
 
-12.03.2024
-
-- Oskar Feed Jakobsen
-- Thorbjørn Djupvik
-- Vemund Aakre
+13.03.2024
 
 ---
 
 ## Hensikt
+
+*Kopiert fra prosjektbeskrivelsen.*
+
 Målet med dette prosjektet er å forstå hvordan dyp læring (deep learning) fungerer.
 Mer spesifikt skal vi implementere transformermodellen som er av hovedkomponentene
 i store språkmodeller som ChatGPT.
@@ -25,20 +24,26 @@ språk ved å predikere neste bokstav i en setning.
 
 Oversikt over filer som skal leveres inn samt en beskrivelse av innholdet.
 
-- `handin.ipynb`: hovednotebook for prosjektet
+- `src/`: kildekode
+    - `handin.ipynb`: hovednotebook for prosjektet
 
-- `neural_network.py`: Klassen `NeuralNetwork`
-- `layers.py`: `SoftMax`, `Attention`, `CrossEntropy`, `LinearLayer`, `ReLu`, `EmbedPosition` and `FeedForward`
-- `layers_numba.py`: numbaifisert versjon av `layers.py`.
-- `utils.py`: inneholder `onehot()`
-- `utils_numba.py`: numbaifisert versjon av `utils.py`.
+    - `neural_network.py`: Klassen `NeuralNetwork`
+    - `layers.py`: `SoftMax`, `Attention`, `CrossEntropy`, `LinearLayer`, `ReLu`, `EmbedPosition` and `FeedForward`
+    - `layers_numba.py`: numbaifisert versjon av `layers.py`
+    - `utils.py`: inneholder `onehot()`
+    - `utils_numba.py`: numbaifisert versjon av `utils.py`
 
-- `data_generators.py`: har funksjonar til å generera trenings- og testdata.
-- `test_implementation.ipynb`: notebook med diverse tester
+    - `data_generators.py`: har funksjonar til å generera trenings- og testdata.
+    - `text_generation.py`: genererer tekst.
+    - `test_implementation.ipynb`: notebook med diverse tester
 
-- `train_network.py`: trener nettverket på treningsdata
-- `test_network.py`: tester nettverket på testdata
-- `train_test_params.py`: dataklasser med trenings- og testdata.
+    - `train_network.py`: trener nettverket på treningsdata
+    - `test_network.py`: tester nettverket på testdata
+    - `train_test_params.py`: dataklasser med trenings- og testdata
 
-- `?.pkl`: modeller som er trent over lang tid ($10000+$ iterasjoner)
+    - `input.txt`: Utlevert Shakespeare-tekst
+    - `shakespeare.txt`: Shakespeare samlede verk
 
+    - `*_dumps/`: nettverk trent over $1000$+ iterasjoner.
+- `Pipfile`: TOML fil for lage et virtuelt miljø med Pipenv
+- `Pipfile.lock`: Låser nøyaktige versjoner av pakker brukt i det virtuelle miljøet. Installeres med kommandoen `pipenv sync`.
