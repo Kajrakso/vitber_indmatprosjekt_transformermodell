@@ -152,6 +152,9 @@ def dump_layer(layer: nl.Layer) -> tuple[str, list]:
             Softmax,
             Relu,
             CrossEntropy,
+            LinearLayer,
+            Layer,
+            Attention,
         ),
     ):
         raise ValueError(
@@ -239,6 +242,11 @@ def convert_params_to_python(
             "V": np.asarray(V),
         }
     return new_params
+
+
+# -------------------------------
+# Loading logic for numba-layers
+# -------------------------------
 
 
 def convert_params_to_numba(params: dict[str, dict[str, np.ndarray]]) -> types.DictType:
