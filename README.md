@@ -2,6 +2,10 @@
 
 13.03.2024
 
+- Vemund Aakre
+- Thorbjørn Djupvik
+- Oskar Feed Jakobsen
+
 ---
 
 ## Hensikt
