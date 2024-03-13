@@ -3,6 +3,7 @@ import numpy as np
 from utils import onehot
 from train_test_params import SortParams1, SortParams2, AddParams, TextGenParams
 from layers_numba import FeedForward, Attention, EmbedPosition, Softmax, LinearLayer
+from typing import Callable
 
 
 def init_neural_network(
@@ -55,12 +56,13 @@ def train_network(
     x_train: np.ndarray,
     y_train: np.ndarray,
     loss_func,
-    alpha: float,
     n_iter: int,
     num_ints: int,
+    alpha: float,
     dump_to_pickle_file: bool = True,
     file_name_dump: str = "nn_dump.pkl",
     verbose_logging: bool = False,
+    dynamic_step_size: Callable[[int, float], float] | None = None,
 ) -> np.ndarray:
     """optimizes the parameters in the network using
     the Adam algorithm (Algorithm 3, p. 19 in the project description).
@@ -82,6 +84,8 @@ def train_network(
     """
     num_batches, batch_size, n = x_train.shape
     _, _, n_y = y_train.shape
+
+    alpha_0 = alpha
 
     # prepare matrices
     pad_matrix = np.zeros((batch_size, num_ints, n - n_y))
@@ -120,6 +124,9 @@ def train_network(
         if L[i] < 0.01:
             print("L < 0.01 so we break")
             break
+
+        if dynamic_step_size is not None:
+            alpha = dynamic_step_size(i, alpha_0)
 
     print("\nend of training...\n")
     return L
