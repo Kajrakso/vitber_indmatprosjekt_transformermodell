@@ -60,6 +60,7 @@ def train_network(
     num_ints: int,
     dump_to_pickle_file: bool = True,
     file_name_dump: str = "nn_dump.pkl",
+    verbose_logging: bool = False,
 ) -> np.ndarray:
     """optimizes the parameters in the network using
     the Adam algorithm (Algorithm 3, p. 19 in the project description).
@@ -101,7 +102,7 @@ def train_network(
             )  # pad grad_Z with zeros
             network.backward(grad_Z)
             network.step_adam(alpha)
-            if j % 10 == 0:
+            if verbose_logging and j % 10 == 0:
                 print(f"done with batch {j}/{num_batches}")
 
         L[i] = np.mean(L_batches)
