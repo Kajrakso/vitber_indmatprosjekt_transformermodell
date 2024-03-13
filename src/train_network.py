@@ -78,6 +78,8 @@ def train_network(
         num_ints: size of vocabulary (m in the project description)
         dump_to_pickle_file: bool. Defaults to True
         file_name_dump: default is `nn_dump.pkl`
+        verbose_logging: logs more
+        dymanic_step_size: function for computing a new learning rate each iteration
 
     Returns:
         array with values of the object function at each iteration
